@@ -17,6 +17,11 @@ internal sealed class CursorController
             _stateSaved = true;
         }
 
+        MaintainReleased();
+    }
+
+    internal void MaintainReleased()
+    {
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }

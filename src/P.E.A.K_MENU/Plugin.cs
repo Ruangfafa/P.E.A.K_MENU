@@ -1,5 +1,6 @@
 using BepInEx;
 using BepInEx.Logging;
+using HarmonyLib;
 using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
 
@@ -12,20 +13,33 @@ public partial class Plugin : BaseUnityPlugin
 
     private PeakMenuWindow _menuWindow = null!;
     private MenuInputController _inputController = null!;
+    private Harmony _harmony = null!;
 
     private void Awake()
     {
         Log = Logger;
 
-        _menuWindow = new PeakMenuWindow();
-        _inputController = new MenuInputController(_menuWindow);
+        MenuSettings.Initialize(Config);
 
-        Log.LogInfo($"Plugin {Name} is loaded!");
+        _menuWindow = new PeakMenuWindow();
+
+        _inputController =
+            new MenuInputController(_menuWindow);
+
+        _harmony =
+            new Harmony("ruangfafa.peakmenu");
+
+        _harmony.PatchAll();
+
+        Log.LogInfo(
+            $"Plugin {Name} is loaded!"
+        );
     }
 
     private void Update()
     {
         _inputController.Update();
+        _menuWindow.Update();
     }
 
     private void OnGUI()
@@ -35,6 +49,18 @@ public partial class Plugin : BaseUnityPlugin
 
     private void OnDisable()
     {
-        _menuWindow.Close();
+        MenuState.IsOpen = false;
+        MenuState.IsRebinding = false;
+
+        _menuWindow?.Close();
+    }
+
+    private void OnDestroy()
+    {
+        MenuState.IsOpen = false;
+        MenuState.IsRebinding = false;
+
+        _menuWindow?.Dispose();
+        _harmony?.UnpatchSelf();
     }
 }

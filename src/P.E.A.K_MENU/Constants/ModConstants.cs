@@ -1,4 +1,4 @@
-﻿﻿using UnityEngine;
+﻿using UnityEngine;
 
 namespace P.E.A.K_MENU.Constants;
 
@@ -6,12 +6,28 @@ internal static class ModConstants
 {
     internal const int WindowId = 938421;
 
-    internal const float WindowWidth = 360f;
-    internal const float WindowHeight = 420f;
+    internal const float DefaultWindowWidth = 520f;
+    internal const float DefaultWindowHeight = 850f;
+
+    internal const float MinimumWindowWidth = 520f;
+    internal const float MinimumWindowHeight = 360f;
+
+    internal const float MaximumWindowWidth = 1100f;
+    internal const float MaximumWindowHeight = 850f;
+
     internal const float WindowMargin = 20f;
     internal const float WindowTop = 80f;
 
-    internal const string WindowTitle = "P.E.A.K MENU";
+    internal const float SidebarWidth = 150f;
+    internal const float CategoryButtonHeight = 42f;
 
-    internal static readonly KeyCode ToggleMenuKey = KeyCode.F3;
+    internal const float ResizeHandleSize = 24f;
+    
+    internal const string WindowTitle = "";
+
+    internal const string MainWindowTitle = "P.E.A.K MENU";
+    internal const string WindowAuthorText = "    by Ruangfafa";
+
+    internal static readonly KeyCode DefaultToggleMenuKey =
+        KeyCode.F6;
 }
