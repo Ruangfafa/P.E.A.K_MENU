@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
+using P.E.A.K_MENU.Features.ItemSpawn;
 using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
 
@@ -9,7 +10,11 @@ namespace P.E.A.K_MENU;
 [BepInAutoPlugin]
 public partial class Plugin : BaseUnityPlugin
 {
-    internal static ManualLogSource Log { get; private set; } = null!;
+    internal static ManualLogSource Log
+    {
+        get;
+        private set;
+    } = null!;
 
     private PeakMenuWindow _menuWindow = null!;
     private MenuInputController _inputController = null!;
@@ -19,7 +24,26 @@ public partial class Plugin : BaseUnityPlugin
     {
         Log = Logger;
 
+        Log.LogInfo("P.E.A.K_MENU Awake started.");
+
         MenuSettings.Initialize(Config);
+
+        try
+        {
+            ItemSpawnRuntime.Initialize(Config);
+
+            Log.LogInfo(
+                $"ItemSpawn initialized: " +
+                $"{ItemSpawnRuntime.IsInitialized}"
+            );
+        }
+        catch (System.Exception exception)
+        {
+            Log.LogError(
+                $"ItemSpawn initialization failed: " +
+                $"{exception}"
+            );
+        }
 
         _menuWindow = new PeakMenuWindow();
 
@@ -61,6 +85,9 @@ public partial class Plugin : BaseUnityPlugin
         MenuState.IsRebinding = false;
 
         _menuWindow?.Dispose();
+
+        ItemSpawnRuntime.Dispose();
+
         _harmony?.UnpatchSelf();
     }
 }

@@ -265,15 +265,41 @@ internal sealed class PeakMenuWindow
         int windowId)
     {
         DrawCustomTitleBar();
-        
-        GUILayout.Space(TitleBarHeight - 18f);
 
-        GUILayout.BeginHorizontal();
+        GUILayout.Space(
+            TitleBarHeight - 18f
+        );
 
-        DrawSidebar();
-        DrawCurrentPage();
+        try
+        {
+            GUILayout.BeginHorizontal();
 
-        GUILayout.EndHorizontal();
+            DrawSidebar();
+            DrawCurrentPage();
+
+            GUILayout.EndHorizontal();
+        }
+        catch (System.Exception exception)
+        {
+            Plugin.Log.LogError(
+                $"Failed to draw menu contents: {exception}"
+            );
+
+            /*
+             * 出错后尽可能修复 GUILayout 状态。
+             * 即使 ItemSpawn 页面异常，也不会只剩一个空窗口。
+             */
+            try
+            {
+                GUILayout.EndHorizontal();
+            }
+            catch
+            {
+                // 当前布局组可能尚未成功建立。
+            }
+
+            DrawPageError(exception);
+        }
 
         DrawResizeHandle();
     }
@@ -954,5 +980,34 @@ internal sealed class PeakMenuWindow
 
         BeginCloseAfterMouseRelease();
         currentEvent.Use();
+    }
+    
+    private void DrawPageError(
+        System.Exception exception)
+    {
+        Rect errorRect = new(
+            20f,
+            TitleBarHeight + 12f,
+            Mathf.Max(
+                100f,
+                _windowRect.width - 40f
+            ),
+            Mathf.Max(
+                100f,
+                _windowRect.height
+                - TitleBarHeight
+                - 32f
+            )
+        );
+
+        GUI.Label(
+            errorRect,
+            "菜单页面绘制失败。\n\n" +
+            exception.GetType().Name +
+            "\n" +
+            exception.Message +
+            "\n\n请查看 BepInEx/LogOutput.log。",
+            Styles.Label
+        );
     }
 }
