@@ -868,110 +868,187 @@ internal sealed class StatusService :
     }
 
     private bool ApplyGameStatus(
-        Character character,
-        StatusEffectDefinition effect,
-        float inputAmount,
-        float duration,
-        StatusApplyMode applyMode)
+    Character character,
+    StatusEffectDefinition effect,
+    float inputAmount,
+    float duration,
+    StatusApplyMode applyMode)
+{
+    if (!effect.StatusType.HasValue)
     {
-        if (!effect.StatusType.HasValue)
-        {
-            return false;
-        }
+        return false;
+    }
 
-        CharacterAfflictions? afflictions =
-            FindAfflictions(
-                character
-            );
-
-        if (afflictions is null)
-        {
-            return false;
-        }
-
-        CharacterAfflictions.STATUSTYPE
-            statusType =
-                effect.StatusType.Value;
-
-        float currentAmount = 0f;
-
-        TryGetStatusValue(
-            afflictions,
-            statusType,
-            out currentAmount
+    CharacterAfflictions? afflictions =
+        FindAfflictions(
+            character
         );
 
-        float finalAmount =
-            CalculateFinalAmount(
-                currentAmount,
-                inputAmount,
-                applyMode
-            );
+    if (afflictions is null)
+    {
+        return false;
+    }
 
-        finalAmount = Mathf.Clamp(
+    CharacterAfflictions.STATUSTYPE
+        statusType =
+            effect.StatusType.Value;
+
+    float currentAmount =
+        0f;
+
+    TryGetStatusValue(
+        afflictions,
+        statusType,
+        out currentAmount
+    );
+
+    float finalAmount =
+        CalculateFinalAmount(
+            currentAmount,
+            inputAmount,
+            applyMode
+        );
+
+    finalAmount =
+        Mathf.Clamp(
             finalAmount,
             0f,
             10000f
         );
 
-        switch (effect.ValueMode)
+    string normalizedStatusName =
+        NormalizeName(
+            statusType.ToString()
+        );
+
+    /*
+     * Injury 属于实际受伤/扣血状态。
+     *
+     * SetStatus 对 Injury 表现为变化量，
+     * 不能像普通状态一样把最终目标值直接传入。
+     *
+     * 例如：
+     * 当前 Injury = 0.2
+     * 增加 0.1
+     * 目标为 0.3
+     * 实际只应传入 +0.1
+     *
+     * 减少 0.1 时则传入 -0.1。
+     */
+    if (normalizedStatusName ==
+        "injury")
+    {
+        _timedStatuses.Remove(
+            statusType
+        );
+
+        float injuryChange;
+
+        switch (applyMode)
         {
-            case StatusValueMode.AmountOnly:
-            case StatusValueMode.NativeDecay:
-                /*
-                 * 只写入一次。
-                 *
-                 * NativeDecay 不进入菜单计时器，
-                 * 之后完全交给游戏自身更新。
-                 */
+            case StatusApplyMode.Add:
+                injuryChange =
+                    Mathf.Abs(
+                        inputAmount
+                    );
+                break;
+
+            case StatusApplyMode.Subtract:
+                injuryChange =
+                    -Mathf.Abs(
+                        inputAmount
+                    );
+                break;
+
+            case StatusApplyMode.Set:
+                injuryChange =
+                    finalAmount -
+                    currentAmount;
+                break;
+
+            case StatusApplyMode.Clear:
+                injuryChange =
+                    -currentAmount;
+                break;
+
+            default:
+                injuryChange =
+                    0f;
+                break;
+        }
+
+        if (Mathf.Approximately(
+                injuryChange,
+                0f))
+        {
+            return true;
+        }
+
+        return TrySetStatusValue(
+            afflictions,
+            statusType,
+            injuryChange
+        );
+    }
+
+    switch (effect.ValueMode)
+    {
+        case StatusValueMode.AmountOnly:
+        case StatusValueMode.NativeDecay:
+            /*
+             * 普通状态只写入一次。
+             *
+             * NativeDecay 不进入菜单计时器，
+             * 之后由游戏自身更新。
+             */
+            _timedStatuses.Remove(
+                statusType
+            );
+
+            return TrySetStatusValue(
+                afflictions,
+                statusType,
+                finalAmount
+            );
+
+        case StatusValueMode.TimedConstant:
+        case StatusValueMode.TimedDecay:
+            if (!TrySetStatusValue(
+                    afflictions,
+                    statusType,
+                    finalAmount))
+            {
+                return false;
+            }
+
+            if (finalAmount <= 0f ||
+                applyMode ==
+                StatusApplyMode.Clear)
+            {
                 _timedStatuses.Remove(
                     statusType
                 );
 
-                return TrySetStatusValue(
-                    afflictions,
-                    statusType,
-                    finalAmount
-                );
+                return true;
+            }
 
-            case StatusValueMode.TimedConstant:
-            case StatusValueMode.TimedDecay:
-                if (!TrySetStatusValue(
-                        afflictions,
+            _timedStatuses[
+                statusType] =
+                    new ActiveTimedStatus(
                         statusType,
-                        finalAmount))
-                {
-                    return false;
-                }
-
-                if (finalAmount <= 0f ||
-                    applyMode ==
-                    StatusApplyMode.Clear)
-                {
-                    _timedStatuses.Remove(
-                        statusType
+                        effect.ValueMode,
+                        finalAmount,
+                        Time.unscaledTime,
+                        Time.unscaledTime +
+                        duration
                     );
 
-                    return true;
-                }
+            return true;
 
-                _timedStatuses[
-                    statusType] =
-                        new ActiveTimedStatus(
-                            statusType,
-                            effect.ValueMode,
-                            finalAmount,
-                            Time.unscaledTime,
-                            Time.unscaledTime +
-                            duration
-                        );
-
-                return true;
-
-            default:
-                return false;
-        }
+        default:
+            return false;
     }
+}
 
     private void MaintainTimedStatuses(
         Character character)
