@@ -267,13 +267,17 @@ internal sealed class MenuStyles
     {
         var style = new GUIStyle(GUI.skin.button)
         {
-            alignment = TextAnchor.MiddleLeft,
+            alignment =
+                TextAnchor.MiddleLeft,
+
+            imagePosition =
+                ImagePosition.TextOnly,
 
             padding = new RectOffset(
-                14,
+                44,
                 10,
-                0,
-                0
+                5,
+                5
             ),
 
             margin = new RectOffset(

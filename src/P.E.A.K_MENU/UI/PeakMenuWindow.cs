@@ -10,6 +10,12 @@ internal sealed class PeakMenuWindow
 {
     private const float TitleBarHeight = 38f;
     private const float ResizeHandleMargin = 4f;
+    
+    private const float CategoryIconSize =
+        24f;
+
+    private const float CategoryIconLeftPadding =
+        10f;
 
     private readonly CursorController _cursorController =
         new();
@@ -436,49 +442,111 @@ internal sealed class PeakMenuWindow
                 ? Styles.CategoryButtonSelected
                 : Styles.CategoryButton;
 
+        Texture2D? icon =
+            GetCategoryIcon(
+                category
+            );
+
         /*
-         * 这里不直接禁用传送按钮。
-         *
-         * 原因是玩家可能刚刚加入房间，
-         * TeleportService 的缓存还没有刷新。
-         * 保持按钮可点击，点击后立即扫描并决定能否进入。
+         * 先让 GUILayout 分配一个固定高度的按钮区域。
+         * 不把大尺寸 Texture2D 交给 GUIContent，
+         * 避免原图尺寸撑大侧栏。
          */
-        bool clicked =
-            GUILayout.Button(
-                label,
+        Rect buttonRect =
+            GUILayoutUtility.GetRect(
+                GUIContent.none,
                 style,
                 GUILayout.Height(
                     ModConstants.CategoryButtonHeight
-                )
+                ),
+                GUILayout.ExpandWidth(true)
             );
+
+        bool clicked =
+            GUI.Button(
+                buttonRect,
+                label,
+                style
+            );
+
+        if (icon is not null)
+        {
+            float iconY =
+                buttonRect.y +
+                (
+                    buttonRect.height -
+                    CategoryIconSize
+                ) *
+                0.5f;
+
+            Rect iconRect =
+                new(
+                    buttonRect.x +
+                    CategoryIconLeftPadding,
+                    iconY,
+                    CategoryIconSize,
+                    CategoryIconSize
+                );
+
+            /*
+             * ScaleMode.ScaleToFit 保持原图比例，
+             * 不会把图标拉伸变形。
+             */
+            GUI.DrawTexture(
+                iconRect,
+                icon,
+                ScaleMode.ScaleToFit,
+                alphaBlend: true
+            );
+        }
 
         if (!clicked)
         {
             return;
         }
 
-        /*
-         * 当前已经在这个分类时不重复切换。
-         *
-         * 传送页除外，因为再次点击传送分类时，
-         * 仍然需要重新扫描房间玩家。
-         */
         if (isSelected &&
-            category != MenuCategory.Teleport)
+            category !=
+            MenuCategory.Teleport)
         {
             return;
         }
 
-        if (!CanSelectCategory(category))
+        if (!CanSelectCategory(
+                category))
         {
             return;
         }
 
-        _selectedCategory = category;
+        _selectedCategory =
+            category;
 
         Plugin.Log.LogInfo(
             $"Selected menu category: {category}"
         );
+    }
+    
+    private static Texture2D?
+        GetCategoryIcon(
+            MenuCategory category)
+    {
+        return category switch
+        {
+            MenuCategory.ItemSpawner =>
+                MenuIcons.Item,
+
+            MenuCategory.Teleport =>
+                MenuIcons.Teleport,
+
+            MenuCategory.Flight =>
+                MenuIcons.Flight,
+
+            MenuCategory.Status =>
+                MenuIcons.Status,
+
+            _ =>
+                null
+        };
     }
     
     private static bool CanSelectCategory(

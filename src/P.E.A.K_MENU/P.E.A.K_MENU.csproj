@@ -49,6 +49,11 @@
       Include="$(TargetPath)"
       Destination="plugins/" />
   </ItemGroup>
+  
+  <!-- 图标 -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Icons\*.png" />
+  </ItemGroup>
 
   <!-- Thunderstore package metadata -->
   <ItemGroup>
@@ -80,6 +85,9 @@
     <ThunderstoreDependency
       Include="Hamunii-DetourContext_Dispose_Fix"
       Version="1.0.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Assets\" />
   </ItemGroup>
 
 </Project>

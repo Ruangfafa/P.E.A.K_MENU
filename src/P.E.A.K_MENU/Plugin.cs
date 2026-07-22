@@ -38,6 +38,8 @@ public partial class Plugin :
         );
 
         MenuSettings.Initialize(Config);
+        
+        MenuIcons.Initialize();
 
         InitializeFeature(
             "ItemSpawn",
@@ -119,6 +121,8 @@ public partial class Plugin :
         MenuState.IsRebinding = false;
 
         _menuWindow?.Dispose();
+        
+        MenuIcons.Dispose();
 
         /*
          * Flight 必须先于 Status 释放，
