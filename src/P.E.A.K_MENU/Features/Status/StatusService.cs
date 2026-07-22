@@ -893,7 +893,8 @@ internal sealed class StatusService :
             statusType =
                 effect.StatusType.Value;
 
-        float currentAmount = 0f;
+        float currentAmount =
+            0f;
 
         TryGetStatusValue(
             afflictions,
@@ -908,21 +909,22 @@ internal sealed class StatusService :
                 applyMode
             );
 
-        finalAmount = Mathf.Clamp(
-            finalAmount,
-            0f,
-            10000f
-        );
+        finalAmount =
+            Mathf.Clamp(
+                finalAmount,
+                0f,
+                10000f
+            );
 
         switch (effect.ValueMode)
         {
             case StatusValueMode.AmountOnly:
             case StatusValueMode.NativeDecay:
                 /*
-                 * 只写入一次。
+                 * 普通状态只写入一次。
                  *
                  * NativeDecay 不进入菜单计时器，
-                 * 之后完全交给游戏自身更新。
+                 * 之后由游戏自身更新。
                  */
                 _timedStatuses.Remove(
                     statusType
@@ -1100,10 +1102,14 @@ internal sealed class StatusService :
 
             /*
              * Weight 使用独立的负重功能。
+             * Injury / 受伤 / 扣血逻辑暂不提供。
              */
             if (runtimeName.Equals(
                     "Weight",
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase) ||
+                NormalizeName(
+                    runtimeName
+                ) == "injury")
             {
                 continue;
             }
@@ -1250,7 +1256,6 @@ internal sealed class StatusService :
                 "hot" => "炎热",
                 "heat" => "炎热",
                 "hunger" => "饥饿",
-                "injury" => "受伤 / 扣血",
                 "curse" => "诅咒",
                 "drowsy" => "困倦",
                 "sleep" => "睡眠",
