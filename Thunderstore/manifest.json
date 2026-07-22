@@ -1,0 +1,9 @@
+{
+  "name": "PEAK_MENU_CN",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/Ruangfafa/P.E.A.K_MENU",
+  "description": "",
+  "dependencies": [
+    "BepInEx-BepInExPack_PEAK-5.4.75301"
+  ]
+}
