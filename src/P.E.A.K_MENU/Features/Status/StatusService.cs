@@ -868,187 +868,112 @@ internal sealed class StatusService :
     }
 
     private bool ApplyGameStatus(
-    Character character,
-    StatusEffectDefinition effect,
-    float inputAmount,
-    float duration,
-    StatusApplyMode applyMode)
-{
-    if (!effect.StatusType.HasValue)
+        Character character,
+        StatusEffectDefinition effect,
+        float inputAmount,
+        float duration,
+        StatusApplyMode applyMode)
     {
-        return false;
-    }
-
-    CharacterAfflictions? afflictions =
-        FindAfflictions(
-            character
-        );
-
-    if (afflictions is null)
-    {
-        return false;
-    }
-
-    CharacterAfflictions.STATUSTYPE
-        statusType =
-            effect.StatusType.Value;
-
-    float currentAmount =
-        0f;
-
-    TryGetStatusValue(
-        afflictions,
-        statusType,
-        out currentAmount
-    );
-
-    float finalAmount =
-        CalculateFinalAmount(
-            currentAmount,
-            inputAmount,
-            applyMode
-        );
-
-    finalAmount =
-        Mathf.Clamp(
-            finalAmount,
-            0f,
-            10000f
-        );
-
-    string normalizedStatusName =
-        NormalizeName(
-            statusType.ToString()
-        );
-
-    /*
-     * Injury 属于实际受伤/扣血状态。
-     *
-     * SetStatus 对 Injury 表现为变化量，
-     * 不能像普通状态一样把最终目标值直接传入。
-     *
-     * 例如：
-     * 当前 Injury = 0.2
-     * 增加 0.1
-     * 目标为 0.3
-     * 实际只应传入 +0.1
-     *
-     * 减少 0.1 时则传入 -0.1。
-     */
-    if (normalizedStatusName ==
-        "injury")
-    {
-        _timedStatuses.Remove(
-            statusType
-        );
-
-        float injuryChange;
-
-        switch (applyMode)
+        if (!effect.StatusType.HasValue)
         {
-            case StatusApplyMode.Add:
-                injuryChange =
-                    Mathf.Abs(
-                        inputAmount
-                    );
-                break;
-
-            case StatusApplyMode.Subtract:
-                injuryChange =
-                    -Mathf.Abs(
-                        inputAmount
-                    );
-                break;
-
-            case StatusApplyMode.Set:
-                injuryChange =
-                    finalAmount -
-                    currentAmount;
-                break;
-
-            case StatusApplyMode.Clear:
-                injuryChange =
-                    -currentAmount;
-                break;
-
-            default:
-                injuryChange =
-                    0f;
-                break;
+            return false;
         }
 
-        if (Mathf.Approximately(
-                injuryChange,
-                0f))
+        CharacterAfflictions? afflictions =
+            FindAfflictions(
+                character
+            );
+
+        if (afflictions is null)
         {
-            return true;
+            return false;
         }
 
-        return TrySetStatusValue(
+        CharacterAfflictions.STATUSTYPE
+            statusType =
+                effect.StatusType.Value;
+
+        float currentAmount =
+            0f;
+
+        TryGetStatusValue(
             afflictions,
             statusType,
-            injuryChange
+            out currentAmount
         );
-    }
 
-    switch (effect.ValueMode)
-    {
-        case StatusValueMode.AmountOnly:
-        case StatusValueMode.NativeDecay:
-            /*
-             * 普通状态只写入一次。
-             *
-             * NativeDecay 不进入菜单计时器，
-             * 之后由游戏自身更新。
-             */
-            _timedStatuses.Remove(
-                statusType
+        float finalAmount =
+            CalculateFinalAmount(
+                currentAmount,
+                inputAmount,
+                applyMode
             );
 
-            return TrySetStatusValue(
-                afflictions,
-                statusType,
-                finalAmount
+        finalAmount =
+            Mathf.Clamp(
+                finalAmount,
+                0f,
+                10000f
             );
 
-        case StatusValueMode.TimedConstant:
-        case StatusValueMode.TimedDecay:
-            if (!TrySetStatusValue(
-                    afflictions,
-                    statusType,
-                    finalAmount))
-            {
-                return false;
-            }
-
-            if (finalAmount <= 0f ||
-                applyMode ==
-                StatusApplyMode.Clear)
-            {
+        switch (effect.ValueMode)
+        {
+            case StatusValueMode.AmountOnly:
+            case StatusValueMode.NativeDecay:
+                /*
+                 * 普通状态只写入一次。
+                 *
+                 * NativeDecay 不进入菜单计时器，
+                 * 之后由游戏自身更新。
+                 */
                 _timedStatuses.Remove(
                     statusType
                 );
 
-                return true;
-            }
+                return TrySetStatusValue(
+                    afflictions,
+                    statusType,
+                    finalAmount
+                );
 
-            _timedStatuses[
-                statusType] =
-                    new ActiveTimedStatus(
+            case StatusValueMode.TimedConstant:
+            case StatusValueMode.TimedDecay:
+                if (!TrySetStatusValue(
+                        afflictions,
                         statusType,
-                        effect.ValueMode,
-                        finalAmount,
-                        Time.unscaledTime,
-                        Time.unscaledTime +
-                        duration
+                        finalAmount))
+                {
+                    return false;
+                }
+
+                if (finalAmount <= 0f ||
+                    applyMode ==
+                    StatusApplyMode.Clear)
+                {
+                    _timedStatuses.Remove(
+                        statusType
                     );
 
-            return true;
+                    return true;
+                }
 
-        default:
-            return false;
+                _timedStatuses[
+                    statusType] =
+                        new ActiveTimedStatus(
+                            statusType,
+                            effect.ValueMode,
+                            finalAmount,
+                            Time.unscaledTime,
+                            Time.unscaledTime +
+                            duration
+                        );
+
+                return true;
+
+            default:
+                return false;
+        }
     }
-}
 
     private void MaintainTimedStatuses(
         Character character)
@@ -1177,10 +1102,14 @@ internal sealed class StatusService :
 
             /*
              * Weight 使用独立的负重功能。
+             * Injury / 受伤 / 扣血逻辑暂不提供。
              */
             if (runtimeName.Equals(
                     "Weight",
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase) ||
+                NormalizeName(
+                    runtimeName
+                ) == "injury")
             {
                 continue;
             }
@@ -1327,7 +1256,6 @@ internal sealed class StatusService :
                 "hot" => "炎热",
                 "heat" => "炎热",
                 "hunger" => "饥饿",
-                "injury" => "受伤 / 扣血",
                 "curse" => "诅咒",
                 "drowsy" => "困倦",
                 "sleep" => "睡眠",

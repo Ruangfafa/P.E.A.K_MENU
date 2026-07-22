@@ -17,11 +17,6 @@ internal sealed class StatusPage :
     private readonly Dictionary<string, string>
         _durationInputs = new();
 
-    private readonly Dictionary<
-        string,
-        StatusApplyMode>
-        _applyModes = new();
-
     private Vector2 _pageScroll;
     private Vector2 _specialEffectsScroll;
 
@@ -398,23 +393,9 @@ internal sealed class StatusPage :
             StatusEffectKind.GameStatus)
         {
             DrawApplyModeButtons(
+                service,
                 effect,
                 styles
-            );
-
-            GUILayout.Space(5f);
-        }
-
-        if (GUILayout.Button(
-                BuildApplyButtonText(
-                    effect
-                ),
-                styles.ActionButton,
-                GUILayout.Height(38f)))
-        {
-            ApplyEffect(
-                service,
-                effect
             );
         }
 
@@ -472,19 +453,21 @@ internal sealed class StatusPage :
     }
 
     private void DrawApplyModeButtons(
+        StatusService service,
         StatusEffectDefinition effect,
         MenuStyles styles)
     {
         GUILayout.BeginHorizontal();
 
         GUILayout.Label(
-            "应用方式",
+            "操作",
             styles.MutedLabel,
             GUILayout.Width(72f),
-            GUILayout.Height(32f)
+            GUILayout.Height(34f)
         );
 
         DrawApplyModeButton(
+            service,
             effect,
             StatusApplyMode.Add,
             "增加",
@@ -492,6 +475,7 @@ internal sealed class StatusPage :
         );
 
         DrawApplyModeButton(
+            service,
             effect,
             StatusApplyMode.Subtract,
             "减少",
@@ -499,6 +483,7 @@ internal sealed class StatusPage :
         );
 
         DrawApplyModeButton(
+            service,
             effect,
             StatusApplyMode.Set,
             "设为",
@@ -506,6 +491,7 @@ internal sealed class StatusPage :
         );
 
         DrawApplyModeButton(
+            service,
             effect,
             StatusApplyMode.Clear,
             "清零",
@@ -516,35 +502,30 @@ internal sealed class StatusPage :
     }
 
     private void DrawApplyModeButton(
+        StatusService service,
         StatusEffectDefinition effect,
         StatusApplyMode mode,
         string text,
         MenuStyles styles)
     {
-        bool selected =
-            _applyModes[
-                effect.Id] == mode;
-
-        string buttonText =
-            selected
-                ? $"● {text}"
-                : text;
-
         if (GUILayout.Button(
-                buttonText,
+                text,
                 styles.ActionButton,
-                GUILayout.Height(32f),
+                GUILayout.Height(34f),
                 GUILayout.ExpandWidth(true)))
         {
-            _applyModes[
-                effect.Id] =
-                    mode;
+            ApplyEffect(
+                service,
+                effect,
+                mode
+            );
         }
     }
 
     private void ApplyEffect(
         StatusService service,
-        StatusEffectDefinition effect)
+        StatusEffectDefinition effect,
+        StatusApplyMode applyMode)
     {
         float amount =
             effect.DefaultAmount;
@@ -552,7 +533,9 @@ internal sealed class StatusPage :
         float duration =
             effect.DefaultDuration;
 
-        if (effect.ShowAmount)
+        if (effect.ShowAmount &&
+            applyMode !=
+            StatusApplyMode.Clear)
         {
             if (!TryParseNumber(
                     _amountInputs[
@@ -564,7 +547,9 @@ internal sealed class StatusPage :
             }
         }
 
-        if (effect.ShowDuration)
+        if (effect.ShowDuration &&
+            applyMode !=
+            StatusApplyMode.Clear)
         {
             if (!TryParseNumber(
                     _durationInputs[
@@ -585,9 +570,15 @@ internal sealed class StatusPage :
             }
         }
 
-        StatusApplyMode applyMode =
-            _applyModes[
-                effect.Id];
+        if (applyMode ==
+            StatusApplyMode.Clear)
+        {
+            amount =
+                0f;
+
+            duration =
+                0f;
+        }
 
         service.ApplySpecialEffect(
             effect,
@@ -630,22 +621,7 @@ internal sealed class StatusPage :
                                     .InvariantCulture
                             );
             }
-
-            if (!_applyModes.ContainsKey(
-                    effect.Id))
-            {
-                _applyModes[
-                        effect.Id] =
-                    StatusApplyMode.Set;
-            }
         }
-    }
-
-    private static string
-        BuildApplyButtonText(
-            StatusEffectDefinition effect)
-    {
-        return "应用状态";
     }
 
     private bool TryParseNumber(
