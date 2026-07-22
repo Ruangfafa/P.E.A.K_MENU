@@ -2,13 +2,15 @@ using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using P.E.A.K_MENU.Features.ItemSpawn;
+using P.E.A.K_MENU.Features.Teleport;
 using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
 
 namespace P.E.A.K_MENU;
 
 [BepInAutoPlugin]
-public partial class Plugin : BaseUnityPlugin
+public partial class Plugin :
+    BaseUnityPlugin
 {
     internal static ManualLogSource Log
     {
@@ -16,21 +18,32 @@ public partial class Plugin : BaseUnityPlugin
         private set;
     } = null!;
 
-    private PeakMenuWindow _menuWindow = null!;
-    private MenuInputController _inputController = null!;
-    private Harmony _harmony = null!;
+    private PeakMenuWindow
+        _menuWindow = null!;
+
+    private MenuInputController
+        _inputController = null!;
+
+    private Harmony
+        _harmony = null!;
 
     private void Awake()
     {
         Log = Logger;
 
-        Log.LogInfo("P.E.A.K_MENU Awake started.");
+        Log.LogInfo(
+            "P.E.A.K_MENU Awake started."
+        );
 
-        MenuSettings.Initialize(Config);
+        MenuSettings.Initialize(
+            Config
+        );
 
         try
         {
-            ItemSpawnRuntime.Initialize(Config);
+            ItemSpawnRuntime.Initialize(
+                Config
+            );
 
             Log.LogInfo(
                 $"ItemSpawn initialized: " +
@@ -45,13 +58,35 @@ public partial class Plugin : BaseUnityPlugin
             );
         }
 
-        _menuWindow = new PeakMenuWindow();
+        try
+        {
+            TeleportRuntime.Initialize();
+
+            Log.LogInfo(
+                $"Teleport initialized: " +
+                $"{TeleportRuntime.IsInitialized}"
+            );
+        }
+        catch (System.Exception exception)
+        {
+            Log.LogError(
+                $"Teleport initialization failed: " +
+                $"{exception}"
+            );
+        }
+
+        _menuWindow =
+            new PeakMenuWindow();
 
         _inputController =
-            new MenuInputController(_menuWindow);
+            new MenuInputController(
+                _menuWindow
+            );
 
         _harmony =
-            new Harmony("ruangfafa.peakmenu");
+            new Harmony(
+                "ruangfafa.peakmenu"
+            );
 
         _harmony.PatchAll();
 
@@ -64,6 +99,11 @@ public partial class Plugin : BaseUnityPlugin
     {
         _inputController.Update();
         _menuWindow.Update();
+
+        /*
+         * 每n秒自动刷新一次当前房间玩家。
+         */
+        TeleportRuntime.Update();
     }
 
     private void OnGUI()
@@ -87,6 +127,7 @@ public partial class Plugin : BaseUnityPlugin
         _menuWindow?.Dispose();
 
         ItemSpawnRuntime.Dispose();
+        TeleportRuntime.Dispose();
 
         _harmony?.UnpatchSelf();
     }
