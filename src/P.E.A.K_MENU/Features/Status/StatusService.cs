@@ -71,6 +71,8 @@ internal sealed class StatusService :
     private bool _invincible;
     private bool _antiKnockback = true;
     private bool _infiniteStamina;
+    
+    private bool _flightProtectionLock;
 
     private bool _weightOverrideEnabled;
     private float _customWeight;
@@ -91,6 +93,9 @@ internal sealed class StatusService :
 
     internal bool InfiniteStamina =>
         _infiniteStamina;
+    
+    internal bool FlightProtectionLock =>
+        _flightProtectionLock;
 
     internal bool WeightOverrideEnabled =>
         _weightOverrideEnabled;
@@ -177,13 +182,25 @@ internal sealed class StatusService :
     }
 
     internal void SetInvincible(
-        bool enabled)
+        bool enabled,
+        bool force = false)
     {
+        if (_flightProtectionLock &&
+            !force &&
+            !enabled)
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "飞行总开关开启期间，无敌已被锁定。";
+
+            return;
+        }
+
         _invincible = enabled;
 
         StatusProtectionPatch
-            .InvincibleEnabled =
-                enabled;
+                .InvincibleEnabled =
+            enabled;
 
         Character? character =
             Character.localCharacter;
@@ -248,13 +265,25 @@ internal sealed class StatusService :
     }
 
     internal void SetAntiKnockback(
-        bool enabled)
+        bool enabled,
+        bool force = false)
     {
+        if (_flightProtectionLock &&
+            !force &&
+            !enabled)
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "飞行总开关开启期间，防击退已被锁定。";
+
+            return;
+        }
+
         _antiKnockback = enabled;
 
         StatusProtectionPatch
-            .AntiKnockbackEnabled =
-                enabled;
+                .AntiKnockbackEnabled =
+            enabled;
 
         LastSucceeded = true;
 
@@ -262,6 +291,26 @@ internal sealed class StatusService :
             enabled
                 ? "附加保护已开启：阻止击退、摔倒与外力。"
                 : "附加保护已关闭：恢复原版击退与摔倒。";
+    }
+    
+    internal void SetFlightProtectionLock(
+        bool locked)
+    {
+        _flightProtectionLock =
+            locked;
+
+        if (locked)
+        {
+            LastSucceeded = true;
+            LastStatus =
+                "飞行功能已锁定无敌与防击退。";
+        }
+        else
+        {
+            LastSucceeded = true;
+            LastStatus =
+                "飞行保护锁定已解除。";
+        }
     }
 
     internal void SetInfiniteStamina(
@@ -594,6 +643,8 @@ internal sealed class StatusService :
         _invincible = false;
         _antiKnockback = true;
         _infiniteStamina = false;
+        
+        _flightProtectionLock = false;
 
         _weightOverrideEnabled = false;
         _customWeight = 0f;

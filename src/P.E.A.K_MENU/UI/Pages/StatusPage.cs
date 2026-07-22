@@ -114,6 +114,13 @@ internal sealed class StatusPage :
 
         GUILayout.Space(4f);
 
+        /*
+         * 飞行总开关开启时，
+         * 禁止用户修改无敌。
+         */
+        GUI.enabled =
+            !service.FlightProtectionLock;
+
         bool invincible =
             GUILayout.Toggle(
                 service.Invincible,
@@ -122,7 +129,10 @@ internal sealed class StatusPage :
                 GUILayout.Height(40f)
             );
 
-        if (invincible !=
+        GUI.enabled = true;
+
+        if (!service.FlightProtectionLock &&
+            invincible !=
             service.Invincible)
         {
             service.SetInvincible(
@@ -130,8 +140,13 @@ internal sealed class StatusPage :
             );
         }
 
+        /*
+         * 防击退只有在无敌开启、
+         * 且没有被飞行锁定时才允许修改。
+         */
         GUI.enabled =
-            service.Invincible;
+            service.Invincible &&
+            !service.FlightProtectionLock;
 
         bool antiKnockback =
             GUILayout.Toggle(
@@ -143,12 +158,23 @@ internal sealed class StatusPage :
 
         GUI.enabled = true;
 
-        if (antiKnockback !=
+        if (!service.FlightProtectionLock &&
+            antiKnockback !=
             service.AntiKnockback)
         {
             service.SetAntiKnockback(
                 antiKnockback
             );
+        }
+
+        if (service.FlightProtectionLock)
+        {
+            GUILayout.Label(
+                "飞行总开关开启期间，无敌与防击退已被强制开启并锁定。",
+                styles.MutedLabel
+            );
+
+            return;
         }
 
         GUILayout.Label(

@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
+using P.E.A.K_MENU.Features.Flight;
 using P.E.A.K_MENU.Features.ItemSpawn;
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.Features.Teleport;
@@ -50,9 +51,18 @@ public partial class Plugin :
             TeleportRuntime.Initialize
         );
 
+        /*
+         * Flight 依赖 Status，
+         * 所以必须先初始化 Status。
+         */
         InitializeFeature(
             "Status",
             StatusRuntime.Initialize
+        );
+
+        InitializeFeature(
+            "Flight",
+            FlightRuntime.Initialize
         );
 
         _menuWindow =
@@ -82,6 +92,12 @@ public partial class Plugin :
 
         TeleportRuntime.Update();
         StatusRuntime.Update();
+        FlightRuntime.Update();
+    }
+
+    private void FixedUpdate()
+    {
+        FlightRuntime.FixedUpdate();
     }
 
     private void OnGUI()
@@ -103,6 +119,12 @@ public partial class Plugin :
         MenuState.IsRebinding = false;
 
         _menuWindow?.Dispose();
+
+        /*
+         * Flight 必须先于 Status 释放，
+         * 才能恢复保存的状态。
+         */
+        FlightRuntime.Dispose();
 
         ItemSpawnRuntime.Dispose();
         TeleportRuntime.Dispose();
