@@ -7,12 +7,12 @@ using UnityEngine;
 namespace P.E.A.K_MENU.Features.Teleport;
 
 /// <summary>
-/// 负责扫描房间玩家和执行网络传送。
+/// 扫描房间玩家并执行传送。
 /// </summary>
 internal sealed class TeleportService
 {
     private const float AutomaticRefreshInterval =
-        3f;
+        1f;
 
     private const float HorizontalArrivalOffset =
         1.1f;
@@ -28,6 +28,9 @@ internal sealed class TeleportService
     internal IReadOnlyList<TeleportPlayerEntry>
         Players => _players;
 
+    internal bool HasOtherPlayers =>
+        _players.Count > 0;
+
     internal string LastStatus
     {
         get;
@@ -40,9 +43,6 @@ internal sealed class TeleportService
         private set;
     }
 
-    /// <summary>
-    /// 按固定间隔自动刷新玩家列表。
-    /// </summary>
     internal void Update()
     {
         if (Time.unscaledTime <
@@ -59,9 +59,11 @@ internal sealed class TeleportService
     }
 
     /// <summary>
-    /// 立即重新扫描当前场景中的角色。
+    /// 刷新当前房间玩家。
+    ///
+    /// 返回 true 表示至少存在一名自己以外的玩家。
     /// </summary>
-    internal void RefreshPlayers()
+    internal bool RefreshPlayers()
     {
         _nextRefreshTime =
             Time.unscaledTime +
@@ -70,13 +72,9 @@ internal sealed class TeleportService
         Character? localCharacter =
             Character.localCharacter;
 
-        /*
-         * 使用 Resources.FindObjectsOfTypeAll，
-         * 因为部分网络角色在扫描瞬间可能尚未处于
-         *普通 FindObjectsOfType 能找到的状态。
-         */
         Character[] discoveredCharacters =
-            Resources.FindObjectsOfTypeAll<Character>();
+            Resources.FindObjectsOfTypeAll<
+                Character>();
 
         var discoveredPlayers =
             new List<TeleportPlayerEntry>();
@@ -84,15 +82,13 @@ internal sealed class TeleportService
         foreach (Character character
                  in discoveredCharacters)
         {
-            if (!IsUsableCharacter(character))
+            if (!IsUsableCharacter(
+                    character))
             {
                 continue;
             }
 
-            /*
-             * 不在列表中显示本地玩家自己。
-             */
-            if (localCharacter != null &&
+            if (localCharacter is not null &&
                 character == localCharacter)
             {
                 continue;
@@ -101,7 +97,7 @@ internal sealed class TeleportService
             PhotonView? photonView =
                 character.photonView;
 
-            if (photonView == null)
+            if (photonView is null)
             {
                 continue;
             }
@@ -113,17 +109,13 @@ internal sealed class TeleportService
                 );
 
             /*
-             * 使用 ActorNumber 去重。
-             * 某些场景切换期间可能短暂保留旧角色。
+             * ActorNumber 相同的角色只保留一个。
+             * 场景切换时可能会短暂残留旧 Character。
              */
-            bool alreadyAdded =
-                discoveredPlayers.Any(
+            if (discoveredPlayers.Any(
                     player =>
                         player.ActorNumber ==
-                        actorNumber
-                );
-
-            if (alreadyAdded)
+                        actorNumber))
             {
                 continue;
             }
@@ -155,46 +147,62 @@ internal sealed class TeleportService
         );
 
         _players.Clear();
-        _players.AddRange(discoveredPlayers);
+        _players.AddRange(
+            discoveredPlayers
+        );
 
-        if (Character.localCharacter is null)
+        if (localCharacter is null)
         {
             LastSucceeded = false;
             LastStatus =
                 "尚未找到本地玩家，请先进入关卡。";
 
-            return;
+            return false;
         }
 
         if (_players.Count == 0)
         {
             LastSucceeded = false;
             LastStatus =
-                "当前没有扫描到其他玩家。";
+                "当前没有自己以外的玩家。";
 
-            return;
+            return false;
         }
 
-        /*
-         * 玩家列表刷新成功时，不覆盖刚刚发生的
-         * 传送成功提示。
-         */
-        if (!LastSucceeded ||
-            LastStatus.StartsWith(
-                "当前没有",
-                StringComparison.Ordinal))
+        LastSucceeded = true;
+        LastStatus =
+            $"已扫描到 {_players.Count} 名其他玩家。";
+
+        return true;
+    }
+
+    /// <summary>
+    /// 用于进入传送菜单前检查。
+    /// 每次都会立即刷新。
+    /// </summary>
+    internal bool CanOpenMenu()
+    {
+        bool available =
+            RefreshPlayers();
+
+        if (!available)
         {
-            LastSucceeded = true;
+            LastSucceeded = false;
             LastStatus =
-                $"已扫描到 {_players.Count} 名其他玩家。";
+                "当前没有其他玩家，无法进入传送菜单。";
         }
+
+        return available;
     }
 
     /// <summary>
     /// 把本地玩家传送到目标玩家附近。
+    ///
+    /// 执行前重新扫描，并根据 ActorNumber
+    /// 获取最新的 Character 对象。
     /// </summary>
     internal void TeleportLocalTo(
-        TeleportPlayerEntry target)
+        TeleportPlayerEntry selectedTarget)
     {
         LastSucceeded = false;
 
@@ -209,10 +217,16 @@ internal sealed class TeleportService
             return;
         }
 
-        if (!ValidateTarget(target))
+        if (!TryResolveFreshTarget(
+                selectedTarget,
+                out TeleportPlayerEntry?
+                    freshTarget))
         {
             return;
         }
+
+        TeleportPlayerEntry target =
+            freshTarget!;
 
         Vector3 targetPosition =
             ResolveCharacterWorldPosition(
@@ -244,7 +258,6 @@ internal sealed class TeleportService
         }
 
         LastSucceeded = true;
-
         LastStatus =
             $"已传送到 {target.DisplayName} 附近。";
 
@@ -257,9 +270,12 @@ internal sealed class TeleportService
 
     /// <summary>
     /// 把目标玩家传送到本地玩家附近。
+    ///
+    /// 执行前重新扫描，并根据 ActorNumber
+    /// 获取最新的 Character 对象。
     /// </summary>
     internal void BringPlayerToLocal(
-        TeleportPlayerEntry target)
+        TeleportPlayerEntry selectedTarget)
     {
         LastSucceeded = false;
 
@@ -274,7 +290,10 @@ internal sealed class TeleportService
             return;
         }
 
-        if (!ValidateTarget(target))
+        if (!TryResolveFreshTarget(
+                selectedTarget,
+                out TeleportPlayerEntry?
+                    freshTarget))
         {
             return;
         }
@@ -283,6 +302,9 @@ internal sealed class TeleportService
             ResolveCharacterWorldPosition(
                 localCharacter
             );
+
+        TeleportPlayerEntry target =
+            freshTarget!;
 
         Vector3 destination =
             CalculateArrivalPosition(
@@ -309,9 +331,9 @@ internal sealed class TeleportService
         }
 
         LastSucceeded = true;
-
         LastStatus =
-            $"已将 {target.DisplayName} 传送到你附近。";
+            $"已将 {target.DisplayName} " +
+            $"传送到你附近。";
 
         Plugin.Log.LogInfo(
             $"Brought player " +
@@ -324,7 +346,6 @@ internal sealed class TeleportService
     internal void Clear()
     {
         _players.Clear();
-
         _nextRefreshTime = 0f;
 
         LastSucceeded = false;
@@ -332,46 +353,93 @@ internal sealed class TeleportService
             "正在扫描房间玩家……";
     }
 
-    private bool ValidateTarget(
-        TeleportPlayerEntry target)
+    /// <summary>
+    /// 操作前重新扫描玩家，
+    /// 并使用 ActorNumber 获取最新目标。
+    /// </summary>
+    private bool TryResolveFreshTarget(
+        TeleportPlayerEntry selectedTarget,
+        out TeleportPlayerEntry? freshTarget)
     {
-        if (target is null ||
-            !target.IsValid)
-        {
-            LastStatus =
-                "目标玩家已经离开或角色无效。";
+        freshTarget = null;
 
-            RefreshPlayers();
+        if (selectedTarget is null)
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "目标玩家无效。";
+
             return false;
         }
 
-        if (target.Character ==
+        int actorNumber =
+            selectedTarget.ActorNumber;
+
+        /*
+         * 每次点击“去”或“来”之前强制刷新。
+         */
+        if (!RefreshPlayers())
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "房间中已没有其他玩家。";
+
+            return false;
+        }
+
+        freshTarget =
+            _players.FirstOrDefault(
+                player =>
+                    player.ActorNumber ==
+                    actorNumber
+            );
+
+        if (freshTarget is null)
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "目标玩家已经离开房间。";
+
+            return false;
+        }
+
+        if (!freshTarget.IsValid)
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "目标玩家角色已经失效。";
+
+            RefreshPlayers();
+
+            freshTarget = null;
+            return false;
+        }
+
+        if (freshTarget.Character ==
             Character.localCharacter)
         {
+            LastSucceeded = false;
             LastStatus =
                 "不能选择本地玩家自己。";
 
+            freshTarget = null;
             return false;
         }
 
-        if (target.Character.photonView
+        if (freshTarget.Character.photonView
             is null)
         {
+            LastSucceeded = false;
             LastStatus =
                 "目标玩家没有可用的 PhotonView。";
 
+            freshTarget = null;
             return false;
         }
 
         return true;
     }
 
-    /// <summary>
-    /// 调用 Character 上的 WarpPlayerRPC。
-    ///
-    /// RpcTarget.All 会让当前客户端、房主和其他客户端
-    /// 都处理相同的位置变化。
-    /// </summary>
     private static bool TryWarpCharacter(
         Character character,
         Vector3 destination,
@@ -396,14 +464,6 @@ internal sealed class TeleportService
 
         try
         {
-            /*
-             * PEAK 当前使用的 RPC 参数：
-             *
-             * Vector3 destination
-             * bool snapCamera
-             *
-             * false 表示不额外强制镜头跳转。
-             */
             photonView.RPC(
                 "WarpPlayerRPC",
                 RpcTarget.All,
@@ -427,19 +487,20 @@ internal sealed class TeleportService
         }
     }
 
-    /// <summary>
-    /// 计算目标玩家旁边的位置，
-    /// 避免两个角色完全重叠。
-    /// </summary>
-    private static Vector3 CalculateArrivalPosition(
-        Character anchor,
-        Character movingCharacter)
+    private static Vector3
+        CalculateArrivalPosition(
+            Character anchor,
+            Character movingCharacter)
     {
         Vector3 anchorPosition =
-            ResolveCharacterWorldPosition(anchor);
+            ResolveCharacterWorldPosition(
+                anchor
+            );
 
         Vector3 sideDirection =
-            ResolveCharacterSideDirection(anchor);
+            ResolveCharacterSideDirection(
+                anchor
+            );
 
         int movingActorNumber =
             ResolveActorNumber(
@@ -452,55 +513,76 @@ internal sealed class TeleportService
                 ? 1f
                 : -1f;
 
-        return anchorPosition +
-               sideDirection *
-               HorizontalArrivalOffset *
-               directionSign +
-               Vector3.up *
-               VerticalArrivalOffset;
-    }
-    
-    /// <summary>
-/// 获取角色身体当前实际所在的世界坐标。
-///
-/// PEAK 的 Character 根节点可能保留在角色生成点，
-/// 因此不能直接使用 character.transform.position。
-/// 这里优先读取骨盆、臀部或躯干刚体的位置。
-/// </summary>
-private static Vector3 ResolveCharacterWorldPosition(
-    Character character)
-{
-    if (character is null)
-    {
-        return Vector3.zero;
+        return
+            anchorPosition +
+            sideDirection *
+            HorizontalArrivalOffset *
+            directionSign +
+            Vector3.up *
+            VerticalArrivalOffset;
     }
 
-    Rigidbody[] rigidbodies =
-        character.GetComponentsInChildren<Rigidbody>(
-            true
-        );
-
-    if (rigidbodies.Length == 0)
+    private static Vector3
+        ResolveCharacterWorldPosition(
+            Character character)
     {
-        return character.transform.position;
-    }
+        Rigidbody[] rigidbodies =
+            character.GetComponentsInChildren<
+                Rigidbody>(
+                    true
+                );
 
-    /*
-     * 优先寻找最能代表角色中心位置的身体部位。
-     */
-    string[] preferredBodyNames =
-    {
-        "hip",
-        "hips",
-        "pelvis",
-        "torso",
-        "chest",
-        "body"
-    };
+        if (rigidbodies.Length == 0)
+        {
+            return character
+                .transform
+                .position;
+        }
 
-    foreach (string preferredName
-             in preferredBodyNames)
-    {
+        string[] preferredBodyNames =
+        {
+            "hip",
+            "hips",
+            "pelvis",
+            "torso",
+            "chest",
+            "body"
+        };
+
+        foreach (string preferredName
+                 in preferredBodyNames)
+        {
+            foreach (Rigidbody rigidbody
+                     in rigidbodies)
+            {
+                if (!IsUsableBodyRigidbody(
+                        rigidbody))
+                {
+                    continue;
+                }
+
+                string rigidbodyName =
+                    rigidbody.name ??
+                    string.Empty;
+
+                if (!rigidbodyName.Contains(
+                        preferredName,
+                        StringComparison
+                            .OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return rigidbody
+                    .worldCenterOfMass;
+            }
+        }
+
+        Vector3 positionSum =
+            Vector3.zero;
+
+        int validCount = 0;
+
         foreach (Rigidbody rigidbody
                  in rigidbodies)
         {
@@ -510,161 +592,126 @@ private static Vector3 ResolveCharacterWorldPosition(
                 continue;
             }
 
-            string rigidbodyName =
-                rigidbody.name ??
-                string.Empty;
+            positionSum +=
+                rigidbody.worldCenterOfMass;
 
-            if (!rigidbodyName.Contains(
-                    preferredName,
-                    StringComparison
-                        .OrdinalIgnoreCase))
+            validCount++;
+        }
+
+        if (validCount > 0)
+        {
+            return
+                positionSum /
+                validCount;
+        }
+
+        return character
+            .transform
+            .position;
+    }
+
+    private static bool
+        IsUsableBodyRigidbody(
+            Rigidbody? rigidbody)
+    {
+        if (rigidbody is null)
+        {
+            return false;
+        }
+
+        GameObject rigidbodyObject =
+            rigidbody.gameObject;
+
+        if (rigidbodyObject is null ||
+            !rigidbodyObject
+                .activeInHierarchy)
+        {
+            return false;
+        }
+
+        Vector3 position =
+            rigidbody.worldCenterOfMass;
+
+        return
+            !float.IsNaN(position.x) &&
+            !float.IsNaN(position.y) &&
+            !float.IsNaN(position.z) &&
+            !float.IsInfinity(position.x) &&
+            !float.IsInfinity(position.y) &&
+            !float.IsInfinity(position.z);
+    }
+
+    private static Vector3
+        ResolveCharacterSideDirection(
+            Character character)
+    {
+        Vector3 sideDirection =
+            character.transform.right;
+
+        Rigidbody[] rigidbodies =
+            character.GetComponentsInChildren<
+                Rigidbody>(
+                    true
+                );
+
+        foreach (Rigidbody rigidbody
+                 in rigidbodies)
+        {
+            if (!IsUsableBodyRigidbody(
+                    rigidbody))
             {
                 continue;
             }
 
-            return rigidbody.worldCenterOfMass;
+            string bodyName =
+                rigidbody.name ??
+                string.Empty;
+
+            bool isCentralBody =
+                bodyName.Contains(
+                    "hip",
+                    StringComparison
+                        .OrdinalIgnoreCase
+                ) ||
+                bodyName.Contains(
+                    "pelvis",
+                    StringComparison
+                        .OrdinalIgnoreCase
+                ) ||
+                bodyName.Contains(
+                    "torso",
+                    StringComparison
+                        .OrdinalIgnoreCase
+                ) ||
+                bodyName.Contains(
+                    "chest",
+                    StringComparison
+                        .OrdinalIgnoreCase
+                );
+
+            if (!isCentralBody)
+            {
+                continue;
+            }
+
+            sideDirection =
+                rigidbody
+                    .transform
+                    .right;
+
+            break;
         }
-    }
 
-    /*
-     * 找不到明确的骨盆或躯干时，
-     * 使用所有有效身体刚体的平均位置。
-     */
-    Vector3 positionSum =
-        Vector3.zero;
+        sideDirection.y = 0f;
 
-    int validCount = 0;
-
-    foreach (Rigidbody rigidbody
-             in rigidbodies)
-    {
-        if (!IsUsableBodyRigidbody(
-                rigidbody))
+        if (sideDirection.sqrMagnitude <
+            0.001f)
         {
-            continue;
+            return Vector3.right;
         }
 
-        positionSum +=
-            rigidbody.worldCenterOfMass;
-
-        validCount++;
+        return sideDirection.normalized;
     }
-
-    if (validCount > 0)
-    {
-        return positionSum / validCount;
-    }
-
-    return character.transform.position;
-}
-
-/// <summary>
-/// 判断刚体是否适合作为角色实际位置参考。
-/// </summary>
-private static bool IsUsableBodyRigidbody(
-    Rigidbody? rigidbody)
-{
-    if (rigidbody is null)
-    {
-        return false;
-    }
-
-    GameObject rigidbodyObject =
-        rigidbody.gameObject;
-
-    if (rigidbodyObject is null ||
-        !rigidbodyObject.activeInHierarchy)
-    {
-        return false;
-    }
-
-    Vector3 position =
-        rigidbody.worldCenterOfMass;
-
-    if (float.IsNaN(position.x) ||
-        float.IsNaN(position.y) ||
-        float.IsNaN(position.z))
-    {
-        return false;
-    }
-
-    if (float.IsInfinity(position.x) ||
-        float.IsInfinity(position.y) ||
-        float.IsInfinity(position.z))
-    {
-        return false;
-    }
-
-    return true;
-}
-
-/// <summary>
-/// 获取角色当前用于左右偏移的方向。
-/// 根节点朝向失效时会尝试使用身体刚体朝向。
-/// </summary>
-private static Vector3 ResolveCharacterSideDirection(
-    Character character)
-{
-    Vector3 sideDirection =
-        character.transform.right;
-
-    Rigidbody[] rigidbodies =
-        character.GetComponentsInChildren<Rigidbody>(
-            true
-        );
-
-    foreach (Rigidbody rigidbody
-             in rigidbodies)
-    {
-        if (!IsUsableBodyRigidbody(
-                rigidbody))
-        {
-            continue;
-        }
-
-        string bodyName =
-            rigidbody.name ??
-            string.Empty;
-
-        bool isCentralBody =
-            bodyName.Contains(
-                "hip",
-                StringComparison.OrdinalIgnoreCase
-            ) ||
-            bodyName.Contains(
-                "pelvis",
-                StringComparison.OrdinalIgnoreCase
-            ) ||
-            bodyName.Contains(
-                "torso",
-                StringComparison.OrdinalIgnoreCase
-            ) ||
-            bodyName.Contains(
-                "chest",
-                StringComparison.OrdinalIgnoreCase
-            );
-
-        if (!isCentralBody)
-        {
-            continue;
-        }
-
-        sideDirection =
-            rigidbody.transform.right;
-
-        break;
-    }
-
-    sideDirection.y = 0f;
-
-    if (sideDirection.sqrMagnitude <
-        0.001f)
-    {
-        return Vector3.right;
-    }
-
-    return sideDirection.normalized;
-}
 
     private static bool IsUsableCharacter(
         Character? character)
@@ -688,12 +735,8 @@ private static Vector3 ResolveCharacterSideDirection(
             return false;
         }
 
-        if (character.photonView is null)
-        {
-            return false;
-        }
-
-        return true;
+        return character.photonView
+               is not null;
     }
 
     private static int ResolveActorNumber(
@@ -702,7 +745,9 @@ private static Vector3 ResolveCharacterSideDirection(
     {
         if (photonView?.Owner is not null)
         {
-            return photonView.Owner.ActorNumber;
+            return photonView
+                .Owner
+                .ActorNumber;
         }
 
         if (photonView is not null &&

@@ -33,8 +33,40 @@ internal sealed class TeleportPage :
         TeleportService service =
             TeleportRuntime.Service;
 
+        /*
+         * 如果正在显示传送页时其他玩家全部离开，
+         * 页面不再提供任何可操作按钮。
+         */
+        if (!service.HasOtherPlayers)
+        {
+            GUILayout.Label(
+                "当前没有自己以外的玩家。",
+                styles.MutedLabel
+            );
+
+            GUILayout.Space(8f);
+
+            GUILayout.Label(
+                "传送菜单暂不可用。",
+                styles.MutedLabel
+            );
+
+            GUILayout.Space(10f);
+
+            if (GUILayout.Button(
+                    "重新扫描房间玩家",
+                    styles.ActionButton,
+                    GUILayout.Height(38f)))
+            {
+                service.RefreshPlayers();
+                _playerScroll = Vector2.zero;
+            }
+
+            return;
+        }
+
         GUILayout.Label(
-            "扫描当前房间玩家。点击“去”传送到对方，" +
+            "点击“去”传送到对方，" +
             "点击“来”将对方传送到自己附近。",
             styles.MutedLabel
         );
@@ -84,23 +116,6 @@ internal sealed class TeleportPage :
                 GUILayout.ExpandHeight(true)
             );
 
-        if (players.Count == 0)
-        {
-            GUILayout.Label(
-                Character.localCharacter is null
-                    ? "请先进入关卡，随后会自动扫描玩家。"
-                    : "房间内暂未发现其他玩家。",
-                styles.MutedLabel
-            );
-
-            GUILayout.EndScrollView();
-            return;
-        }
-
-        /*
-         * 建立数组快照，避免自动刷新玩家列表时
-         * 修改当前正在绘制的集合。
-         */
         TeleportPlayerEntry[] snapshot =
             new TeleportPlayerEntry[
                 players.Count
@@ -155,6 +170,10 @@ internal sealed class TeleportPage :
                 ),
                 GUILayout.Height(36f)))
         {
+            /*
+             * TeleportLocalTo 内部会先刷新，
+             * 再根据 ActorNumber 获取最新对象。
+             */
             service.TeleportLocalTo(
                 player
             );
@@ -168,6 +187,10 @@ internal sealed class TeleportPage :
                 ),
                 GUILayout.Height(36f)))
         {
+            /*
+             * BringPlayerToLocal 内部会先刷新，
+             * 再根据 ActorNumber 获取最新对象。
+             */
             service.BringPlayerToLocal(
                 player
             );

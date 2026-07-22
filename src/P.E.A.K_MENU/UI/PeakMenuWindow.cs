@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using P.E.A.K_MENU.Constants;
 using P.E.A.K_MENU.UI.Pages;
+using P.E.A.K_MENU.Features.Teleport;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI;
@@ -430,16 +431,45 @@ internal sealed class PeakMenuWindow
         bool isSelected =
             _selectedCategory == category;
 
-        GUIStyle style = isSelected
-            ? Styles.CategoryButtonSelected
-            : Styles.CategoryButton;
+        GUIStyle style =
+            isSelected
+                ? Styles.CategoryButtonSelected
+                : Styles.CategoryButton;
 
-        if (!GUILayout.Button(
+        /*
+         * 这里不直接禁用传送按钮。
+         *
+         * 原因是玩家可能刚刚加入房间，
+         * TeleportService 的缓存还没有刷新。
+         * 保持按钮可点击，点击后立即扫描并决定能否进入。
+         */
+        bool clicked =
+            GUILayout.Button(
                 label,
                 style,
                 GUILayout.Height(
                     ModConstants.CategoryButtonHeight
-                )))
+                )
+            );
+
+        if (!clicked)
+        {
+            return;
+        }
+
+        /*
+         * 当前已经在这个分类时不重复切换。
+         *
+         * 传送页除外，因为再次点击传送分类时，
+         * 仍然需要重新扫描房间玩家。
+         */
+        if (isSelected &&
+            category != MenuCategory.Teleport)
+        {
+            return;
+        }
+
+        if (!CanSelectCategory(category))
         {
             return;
         }
@@ -449,6 +479,52 @@ internal sealed class PeakMenuWindow
         Plugin.Log.LogInfo(
             $"Selected menu category: {category}"
         );
+    }
+    
+    private static bool CanSelectCategory(
+        MenuCategory category)
+    {
+        /*
+         * 其他分类没有进入限制。
+         */
+        if (category !=
+            MenuCategory.Teleport)
+        {
+            return true;
+        }
+
+        if (!TeleportRuntime.IsInitialized)
+        {
+            Plugin.Log.LogWarning(
+                "Teleport menu blocked: " +
+                "TeleportRuntime is not initialized."
+            );
+
+            return false;
+        }
+
+        /*
+         * 每次点击传送分类时强制扫描。
+         *
+         * 只有确认存在自己以外的玩家，
+         * 才允许切换到传送页面。
+         */
+        bool hasOtherPlayers =
+            TeleportRuntime
+                .Service
+                .CanOpenMenu();
+
+        if (hasOtherPlayers)
+        {
+            return true;
+        }
+
+        Plugin.Log.LogInfo(
+            "Teleport menu blocked: " +
+            "no other players were found."
+        );
+
+        return false;
     }
 
     private void DrawCurrentPage()
