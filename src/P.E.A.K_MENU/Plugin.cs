@@ -1,39 +1,160 @@
 using BepInEx;
 using BepInEx.Logging;
+using HarmonyLib;
+using P.E.A.K_MENU.Features.Flight;
+using P.E.A.K_MENU.Features.ItemSpawn;
+using P.E.A.K_MENU.Features.Status;
+using P.E.A.K_MENU.Features.Teleport;
+using P.E.A.K_MENU.Input;
+using P.E.A.K_MENU.UI;
 
 namespace P.E.A.K_MENU;
 
-// Here are some basic resources on code style and naming conventions to help
-// you in your first CSharp plugin!
-// https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions
-// https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/identifier-names
-// https://learn.microsoft.com/en-us/dotnet/standard/design-guidelines/names-of-namespaces
-
-// The BepInAutoPlugin attribute comes from the Hamunii.BepInEx.AutoPlugin
-// NuGet package, and it will generate the BepInPlugin attribute for you!
-// For more info, see https://github.com/Hamunii/BepInEx.AutoPlugin
-
-/// <summary>
-/// The BepInEx plugin class of P.E.A.K_MENU.
-/// </summary>
 [BepInAutoPlugin]
-public partial class Plugin : BaseUnityPlugin
+public partial class Plugin :
+    BaseUnityPlugin
 {
-    internal static ManualLogSource Log { get; private set; } = null!;
+    internal static ManualLogSource Log
+    {
+        get;
+        private set;
+    } = null!;
+
+    private PeakMenuWindow
+        _menuWindow = null!;
+
+    private MenuInputController
+        _inputController = null!;
+
+    private Harmony
+        _harmony = null!;
 
     private void Awake()
     {
-        // BepInEx gives us a logger which we can use to log information.
-        // See https://lethal.wiki/dev/fundamentals/logging
         Log = Logger;
 
-        // BepInEx also gives us a config file for easy configuration.
-        // See https://lethal.wiki/dev/intermediate/custom-configs
+        Log.LogInfo(
+            "P.E.A.K_MENU Awake started."
+        );
 
-        // We can apply our hooks here.
-        // See https://lethal.wiki/dev/fundamentals/patching-code
+        MenuSettings.Initialize(Config);
+        
+        MenuIcons.Initialize();
 
-        // Log our awake here so we can see it in LogOutput.log file
-        Log.LogInfo($"Plugin {Name} is loaded!");
+        InitializeFeature(
+            "ItemSpawn",
+            () => ItemSpawnRuntime.Initialize(
+                Config
+            )
+        );
+
+        InitializeFeature(
+            "Teleport",
+            TeleportRuntime.Initialize
+        );
+
+        /*
+         * Flight 依赖 Status，
+         * 所以必须先初始化 Status。
+         */
+        InitializeFeature(
+            "Status",
+            StatusRuntime.Initialize
+        );
+
+        InitializeFeature(
+            "Flight",
+            FlightRuntime.Initialize
+        );
+
+        _menuWindow =
+            new PeakMenuWindow();
+
+        _inputController =
+            new MenuInputController(
+                _menuWindow
+            );
+
+        _harmony =
+            new Harmony(
+                "ruangfafa.peakmenu"
+            );
+
+        _harmony.PatchAll();
+
+        Log.LogInfo(
+            $"Plugin {Name} is loaded!"
+        );
+    }
+
+    private void Update()
+    {
+        _inputController.Update();
+        _menuWindow.Update();
+
+        TeleportRuntime.Update();
+        StatusRuntime.Update();
+        FlightRuntime.Update();
+    }
+
+    private void FixedUpdate()
+    {
+        FlightRuntime.FixedUpdate();
+    }
+
+    private void OnGUI()
+    {
+        _menuWindow.Draw();
+    }
+
+    private void OnDisable()
+    {
+        MenuState.IsOpen = false;
+        MenuState.IsRebinding = false;
+
+        _menuWindow?.Close();
+    }
+
+    private void OnDestroy()
+    {
+        MenuState.IsOpen = false;
+        MenuState.IsRebinding = false;
+
+        _menuWindow?.Dispose();
+        
+        MenuIcons.Dispose();
+
+        /*
+         * Flight 必须先于 Status 释放，
+         * 才能恢复保存的状态。
+         */
+        FlightRuntime.Dispose();
+
+        ItemSpawnRuntime.Dispose();
+        TeleportRuntime.Dispose();
+        StatusRuntime.Dispose();
+
+        _harmony?.UnpatchSelf();
+    }
+
+    private static void InitializeFeature(
+        string name,
+        System.Action initializer)
+    {
+        try
+        {
+            initializer();
+
+            Log.LogInfo(
+                $"{name} initialized."
+            );
+        }
+        catch (System.Exception exception)
+        {
+            Log.LogError(
+                $"{name} initialization failed: " +
+                $"{exception}"
+            );
+        }
     }
 }
