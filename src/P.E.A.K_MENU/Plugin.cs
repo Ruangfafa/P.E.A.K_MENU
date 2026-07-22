@@ -2,6 +2,7 @@ using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using P.E.A.K_MENU.Features.ItemSpawn;
+using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.Features.Teleport;
 using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
@@ -35,45 +36,24 @@ public partial class Plugin :
             "P.E.A.K_MENU Awake started."
         );
 
-        MenuSettings.Initialize(
-            Config
+        MenuSettings.Initialize(Config);
+
+        InitializeFeature(
+            "ItemSpawn",
+            () => ItemSpawnRuntime.Initialize(
+                Config
+            )
         );
 
-        try
-        {
-            ItemSpawnRuntime.Initialize(
-                Config
-            );
+        InitializeFeature(
+            "Teleport",
+            TeleportRuntime.Initialize
+        );
 
-            Log.LogInfo(
-                $"ItemSpawn initialized: " +
-                $"{ItemSpawnRuntime.IsInitialized}"
-            );
-        }
-        catch (System.Exception exception)
-        {
-            Log.LogError(
-                $"ItemSpawn initialization failed: " +
-                $"{exception}"
-            );
-        }
-
-        try
-        {
-            TeleportRuntime.Initialize();
-
-            Log.LogInfo(
-                $"Teleport initialized: " +
-                $"{TeleportRuntime.IsInitialized}"
-            );
-        }
-        catch (System.Exception exception)
-        {
-            Log.LogError(
-                $"Teleport initialization failed: " +
-                $"{exception}"
-            );
-        }
+        InitializeFeature(
+            "Status",
+            StatusRuntime.Initialize
+        );
 
         _menuWindow =
             new PeakMenuWindow();
@@ -100,10 +80,8 @@ public partial class Plugin :
         _inputController.Update();
         _menuWindow.Update();
 
-        /*
-         * 每n秒自动刷新一次当前房间玩家。
-         */
         TeleportRuntime.Update();
+        StatusRuntime.Update();
     }
 
     private void OnGUI()
@@ -128,7 +106,29 @@ public partial class Plugin :
 
         ItemSpawnRuntime.Dispose();
         TeleportRuntime.Dispose();
+        StatusRuntime.Dispose();
 
         _harmony?.UnpatchSelf();
+    }
+
+    private static void InitializeFeature(
+        string name,
+        System.Action initializer)
+    {
+        try
+        {
+            initializer();
+
+            Log.LogInfo(
+                $"{name} initialized."
+            );
+        }
+        catch (System.Exception exception)
+        {
+            Log.LogError(
+                $"{name} initialization failed: " +
+                $"{exception}"
+            );
+        }
     }
 }
