@@ -117,11 +117,6 @@ internal static class StatusProtectionPatch
             return true;
         }
 
-        /*
-         * 使用 Character.IsLocal 判断，
-         * 不再依赖对象引用必须和
-         * Character.localCharacter 完全相同。
-         */
         if (__instance is not Character character ||
             !character.IsLocal)
         {
@@ -138,8 +133,7 @@ internal static class StatusProtectionPatch
         if (deathMethod)
         {
             Plugin.Log.LogInfo(
-                $"Blocked local death: " +
-                $"{methodName}"
+                $"Blocked local death: {methodName}"
             );
 
             return false;
@@ -150,33 +144,217 @@ internal static class StatusProtectionPatch
             return true;
         }
 
-        bool forceOrFallMethod =
+        bool fallMethod =
             methodName == "Fall" ||
             methodName == "RPCA_Fall" ||
             methodName ==
-                "RPCA_FallWithScreenShake" ||
-            methodName == "AddForce" ||
-            methodName ==
-                "AddForceAtPosition" ||
-            methodName ==
-                "RPCA_AddForceAtPosition" ||
-            methodName ==
-                "AddForceToBodyPart" ||
-            methodName ==
-                "RPCA_AddForceToBodyPart";
+            "RPCA_FallWithScreenShake";
 
-        if (!forceOrFallMethod)
+        if (fallMethod)
+        {
+            Plugin.Log.LogInfo(
+                $"Blocked local fall: {methodName}"
+            );
+
+            return false;
+        }
+
+        bool forceMethod =
+            methodName == "AddForce" ||
+            methodName == "AddForceAtPosition" ||
+            methodName ==
+            "RPCA_AddForceAtPosition" ||
+            methodName == "AddForceToBodyPart" ||
+            methodName ==
+            "RPCA_AddForceToBodyPart";
+
+        if (!forceMethod)
+        {
+            return true;
+        }
+
+        /*
+         * 攀爬期间必须允许 Character 的外力方法执行，
+         * 否则向上的攀爬推动力也会被当成击退拦截。
+         */
+        if (IsCharacterClimbing(
+                character))
         {
             return true;
         }
 
         Plugin.Log.LogInfo(
-            $"Blocked local force/fall: " +
-            $"{methodName}"
+            $"Blocked local force: {methodName}"
         );
 
         return false;
     }
+    
+    private static bool IsCharacterClimbing(
+    Character character)
+{
+    if (character is null)
+    {
+        return false;
+    }
+
+    /*
+     * 不直接写死字段，避免不同 PEAK 版本
+     * 攀爬状态成员名称发生变化。
+     */
+    string[] memberNames =
+    {
+        "isClimbing",
+        "IsClimbing",
+        "climbing",
+        "Climbing",
+        "isClimb",
+        "IsClimb"
+    };
+
+    Type characterType =
+        character.GetType();
+
+    foreach (string memberName
+             in memberNames)
+    {
+        PropertyInfo? property =
+            AccessTools.Property(
+                characterType,
+                memberName
+            );
+
+        if (property is not null &&
+            property.PropertyType ==
+                typeof(bool))
+        {
+            try
+            {
+                object? value =
+                    property.GetValue(
+                        character
+                    );
+
+                if (value is bool result &&
+                    result)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // 继续检查其他成员。
+            }
+        }
+
+        FieldInfo? field =
+            AccessTools.Field(
+                characterType,
+                memberName
+            );
+
+        if (field is not null &&
+            field.FieldType ==
+                typeof(bool))
+        {
+            try
+            {
+                object? value =
+                    field.GetValue(
+                        character
+                    );
+
+                if (value is bool result &&
+                    result)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // 继续检查其他成员。
+            }
+        }
+    }
+
+    /*
+     * 某些版本会把攀爬状态放在 CharacterData 中。
+     */
+    object? data =
+        character.data;
+
+    if (data is null)
+    {
+        return false;
+    }
+
+    Type dataType =
+        data.GetType();
+
+    foreach (string memberName
+             in memberNames)
+    {
+        PropertyInfo? property =
+            AccessTools.Property(
+                dataType,
+                memberName
+            );
+
+        if (property is not null &&
+            property.PropertyType ==
+                typeof(bool))
+        {
+            try
+            {
+                object? value =
+                    property.GetValue(
+                        data
+                    );
+
+                if (value is bool result &&
+                    result)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // 继续检查其他成员。
+            }
+        }
+
+        FieldInfo? field =
+            AccessTools.Field(
+                dataType,
+                memberName
+            );
+
+        if (field is not null &&
+            field.FieldType ==
+                typeof(bool))
+        {
+            try
+            {
+                object? value =
+                    field.GetValue(
+                        data
+                    );
+
+                if (value is bool result &&
+                    result)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // 继续检查其他成员。
+            }
+        }
+    }
+
+    return false;
+}
 }
 
 /// <summary>

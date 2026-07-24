@@ -1,83 +1,48 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Project properties -->
   <PropertyGroup>
-    <!--
-      PEAK 当前 Unity 版本对应的目标框架。
-    -->
     <TargetFramework>netstandard2.1</TargetFramework>
 
-    <!--
-      Mod 的稳定程序集标识。
-      发布后不建议修改。
-    -->
     <AssemblyName>ruangfafa.peakmenu</AssemblyName>
-
-    <!-- Mod 显示名称。 -->
     <AssemblyTitle>P.E.A.K_MENU</AssemblyTitle>
 
-    <!--
-      程序集、BepInEx 插件和 Thunderstore 包版本。
-    -->
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
+
+    <Description>PEAK 游戏内实用菜单，包含物品生成、玩家传送、坐标飞行、状态控制、主题与可调整界面。</Description>
   </PropertyGroup>
 
-  <!-- ThunderPipe properties -->
   <PropertyGroup>
     <IsThunderstorePackable>true</IsThunderstorePackable>
 
-    <ThunderstoreName>P.E.A.K_MENU</ThunderstoreName>
+    <ThunderstoreName>PEAK_MENU_CN</ThunderstoreName>
 
-    <ThunderstoreDescription>
-      A configurable in-game utility menu for PEAK.
-    </ThunderstoreDescription>
+    <ThunderstoreDescription>PEAK 游戏内实用菜单，包含物品生成、玩家传送、坐标飞行、状态控制、主题与可调整界面。</ThunderstoreDescription>
 
-    <ThunderstoreCommunities>
-      peak
-    </ThunderstoreCommunities>
+    <ThunderstoreCommunities>peak</ThunderstoreCommunities>
 
-    <ThunderstoreCategories>
-      mods
-    </ThunderstoreCategories>
+    <ThunderstoreCategories>mods</ThunderstoreCategories>
   </PropertyGroup>
 
-  <!--
-    编译后复制和打包的 Mod 文件。
-  -->
   <ItemGroup>
     <ModFile
       Include="$(TargetPath)"
       Destination="plugins/" />
   </ItemGroup>
-  
-  <!-- 图标 -->
+
   <ItemGroup>
     <EmbeddedResource Include="Assets\Icons\*.png" />
   </ItemGroup>
 
-  <!-- Thunderstore package metadata -->
   <ItemGroup>
-    <ThunderstorePackageFile
-      Include="$(SolutionRoot)README.md" />
+    <ThunderstorePackageFile Include="$(SolutionRoot)README.md" />
+    <ThunderstorePackageFile Include="$(SolutionRoot)CHANGELOG.md" />
+    <ThunderstorePackageFile Include="$(SolutionRoot)icon.png" />
+    <ThunderstorePackageFile Include="$(SolutionRoot)LICENSE" />
 
-    <ThunderstorePackageFile
-      Include="$(SolutionRoot)CHANGELOG.md" />
-
-    <ThunderstorePackageFile
-      Include="$(SolutionRoot)icon.png" />
-
-    <ThunderstorePackageFile
-      Include="$(SolutionRoot)LICENSE" />
-
-    <!-- BepInEx 基础依赖。 -->
     <ThunderstoreDependency
       Include="BepInEx-BepInExPack_PEAK"
       Version="5.4.75301" />
 
-    <!--
-      已有的客户端 ItemSpawner 所使用的两个前置。
-      这里只声明 Thunderstore 运行依赖。
-    -->
     <ThunderstoreDependency
       Include="Hamunii-AutoHookGenPatcher"
       Version="1.0.7" />
@@ -85,9 +50,6 @@
     <ThunderstoreDependency
       Include="Hamunii-DetourContext_Dispose_Fix"
       Version="1.0.5" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Assets\" />
   </ItemGroup>
 
 </Project>

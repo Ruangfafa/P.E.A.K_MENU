@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Photon.Pun;
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.UI;
 using UnityEngine;
@@ -9,10 +8,11 @@ using UnityEngine;
 namespace P.E.A.K_MENU.Features.Flight;
 
 /// <summary>
-/// 本地玩家坐标式飞行。
+/// 本地玩家物理式飞行服务。
 ///
-/// 通过 WarpPlayerRPC 直接改变角色坐标，
-/// 不使用推力模拟飞行。
+/// 实际施力由 FlightController 负责；
+/// 本服务负责开关、双击检测、滚轮调速、
+/// 状态保护和退出飞行后的缓降。
 /// </summary>
 internal sealed class FlightService :
     IDisposable
@@ -26,9 +26,9 @@ internal sealed class FlightService :
     private const float MaximumFlightSpeed =
         100f;
 
-    private const float SprintMultiplier =
-        2f;
-
+    /*
+     * 两次空格按下之间的最大间隔。
+     */
     private const float DoubleTapInterval =
         0.30f;
 
@@ -39,19 +39,10 @@ internal sealed class FlightService :
         5f;
 
     /*
-     * 每秒最多发送约 15 次飞行坐标同步。
+     * 退出飞行后的保护：
      *
-     * 较低频率可以减少 Photon RPC 压力，
-     * 并改善低性能设备上的稳定性。
-     */
-    private const float WarpInterval =
-        0.067f;
-
-    /*
-     * 退出飞行后：
-     *
-     * 前 1 秒完全关闭角色刚体重力；
-     * 总计 5 秒保持缓降保护。
+     * 前 1 秒完全无重力；
+     * 总计 5 秒缓降。
      */
     private const float ZeroGravityDuration =
         1f;
@@ -60,8 +51,7 @@ internal sealed class FlightService :
         5f;
 
     /*
-     * 无重力结束后，
-     * 向下速度最多为 -2.25。
+     * 缓降阶段允许的最大向下速度。
      */
     private const float MaximumSlowFallSpeed =
         -2.25f;
@@ -69,38 +59,11 @@ internal sealed class FlightService :
     private bool _enabled;
     private bool _activelyFlying;
 
-    private bool _doubleTapMode =
-        true;
-
-    /*
-     * 默认开启滚轮调速。
-     */
-    private bool _scrollSpeedEnabled =
-        true;
-
-    /*
-     * 默认开启退出飞行保护。
-     */
-    private bool _slowFallEnabled =
-        true;
-
     private float _flightSpeed =
         DefaultFlightSpeed;
 
     private float _lastSpacePressTime =
         -100f;
-
-    /*
-     * 飞行坐标同步时间累计器。
-     *
-     * 每次发送后直接清零，
-     * 不补偿卡顿期间遗漏的同步。
-     */
-    private float _warpAccumulator;
-
-    private Vector3 _flightPosition;
-
-    private bool _flightPositionInitialized;
 
     private Character? _activeCharacter;
 
@@ -108,27 +71,17 @@ internal sealed class FlightService :
     private bool _savedAntiKnockback;
     private bool _hasSavedStatusState;
 
-    /*
-     * 总计 5 秒缓降的到期时间。
-     */
     private float _slowFallUntil;
-
-    /*
-     * 前 1 秒无重力的到期时间。
-     */
     private float _zeroGravityUntil;
 
-    /*
-     * 当前是否存在退出飞行保护。
-     */
     private bool _slowFallWasApplied;
 
     /*
-     * 保存进入无重力前，
-     * 每个刚体原本的 useGravity 状态。
+     * 保存退出飞行缓降开始前，
+     * 每个刚体原本的重力状态。
      */
     private readonly Dictionary<Rigidbody, bool>
-        _savedGravityStates =
+        _slowFallGravityStates =
             new();
 
     internal bool Enabled =>
@@ -136,15 +89,6 @@ internal sealed class FlightService :
 
     internal bool ActivelyFlying =>
         _activelyFlying;
-
-    internal bool DoubleTapMode =>
-        _doubleTapMode;
-
-    internal bool ScrollSpeedEnabled =>
-        _scrollSpeedEnabled;
-
-    internal bool SlowFallEnabled =>
-        _slowFallEnabled;
 
     internal float FlightSpeed =>
         _flightSpeed;
@@ -164,8 +108,8 @@ internal sealed class FlightService :
     internal void Update()
     {
         /*
-         * 退出飞行保护可能在关闭飞行系统后继续存在，
-         * 因此必须在 _enabled 判断之前维护。
+         * 缓降可以在飞行总开关关闭后继续生效，
+         * 因此必须始终维护。
          */
         MaintainSlowFall();
 
@@ -184,12 +128,6 @@ internal sealed class FlightService :
             _activeCharacter =
                 null;
 
-            _flightPositionInitialized =
-                false;
-
-            _warpAccumulator =
-                0f;
-
             LastSucceeded =
                 false;
 
@@ -206,18 +144,9 @@ internal sealed class FlightService :
             _activeCharacter =
                 character;
 
-            _flightPositionInitialized =
-                false;
-
-            _warpAccumulator =
-                0f;
-
-            if (_activelyFlying)
-            {
-                InitializeFlightPosition(
-                    character
-                );
-            }
+            EnsureFlightController(
+                character
+            );
 
             Plugin.Log.LogInfo(
                 $"Flight character changed: " +
@@ -226,138 +155,33 @@ internal sealed class FlightService :
         }
 
         /*
-         * 菜单打开时不处理键盘切换和滚轮调速。
-         *
-         * FixedUpdate 仍然会继续维持飞行坐标，
-         * 因此打开菜单时不会摔落。
+         * 菜单打开时不检测双击空格，
+         * 也不读取滚轮调速。
          */
         if (MenuState.IsOpen)
         {
             return;
         }
 
-        if (_scrollSpeedEnabled &&
-            _activelyFlying)
+        /*
+         * 滚轮调速固定启用。
+         */
+        if (_activelyFlying)
         {
             ReadMouseWheelSpeed();
         }
 
-        if (_doubleTapMode)
-        {
-            DetectDoubleSpace();
-        }
-    }
-
-    internal void FixedUpdate()
-    {
-        if (!_enabled ||
-            !_activelyFlying)
-        {
-            return;
-        }
-
-        Character? character =
-            Character.localCharacter;
-
-        if (character is null ||
-            !character.IsLocal)
-        {
-            return;
-        }
-
-        if (!_flightPositionInitialized ||
-            !ReferenceEquals(
-                _activeCharacter,
-                character))
-        {
-            _activeCharacter =
-                character;
-
-            InitializeFlightPosition(
-                character
-            );
-        }
-
         /*
-         * 菜单打开时仍然持续锁定飞行坐标，
-         * 但不读取任何移动按键。
+         * 双击空格固定启用。
          */
-        Vector3 movement =
-            MenuState.IsOpen
-                ? Vector3.zero
-                : ReadMovementDirection(
-                    character
-                );
-
-        if (movement.sqrMagnitude >
-            1f)
-        {
-            movement.Normalize();
-        }
-
-        float speed =
-            _flightSpeed;
-
-        if (!MenuState.IsOpen &&
-            (UnityEngine.Input.GetKey(
-                 KeyCode.LeftShift) ||
-             UnityEngine.Input.GetKey(
-                 KeyCode.RightShift)))
-        {
-            speed *=
-                SprintMultiplier;
-        }
-
-        _flightPosition +=
-            movement *
-            speed *
-            Time.fixedDeltaTime;
-
-        /*
-         * 即使没有移动输入，
-         * 也继续发送锁定坐标，
-         * 防止角色受到重力影响。
-         */
-        _warpAccumulator +=
-            Time.fixedDeltaTime;
-
-        if (_warpAccumulator <
-            WarpInterval)
-        {
-            return;
-        }
-
-        /*
-         * 发送一次后直接清零。
-         *
-         * 不补发卡顿期间遗漏的坐标同步，
-         * 防止低性能设备恢复后产生 RPC 堆积。
-         */
-        _warpAccumulator =
-            0f;
-
-        if (!TryWarpCharacter(
-                character,
-                _flightPosition,
-                out string error))
-        {
-            LastSucceeded =
-                false;
-
-            LastStatus =
-                $"飞行坐标更新失败：{error}";
-
-            return;
-        }
-
-        LastSucceeded =
-            true;
+        DetectDoubleSpace();
     }
 
     internal void SetEnabled(
         bool enabled)
     {
-        if (_enabled == enabled)
+        if (_enabled ==
+            enabled)
         {
             return;
         }
@@ -373,102 +197,13 @@ internal sealed class FlightService :
         );
     }
 
-    internal void SetDoubleTapMode(
-        bool enabled)
-    {
-        if (_doubleTapMode == enabled)
-        {
-            return;
-        }
-
-        _doubleTapMode =
-            enabled;
-
-        _lastSpacePressTime =
-            -100f;
-
-        _warpAccumulator =
-            0f;
-
-        if (!_enabled)
-        {
-            LastSucceeded =
-                true;
-
-            LastStatus =
-                enabled
-                    ? "已选择双击空格切换实际飞行。"
-                    : "已选择开启总开关后立即飞行。";
-
-            return;
-        }
-
-        if (enabled)
-        {
-            SetActiveFlight(
-                false
-            );
-
-            LastSucceeded =
-                true;
-
-            LastStatus =
-                "双击模式已开启，目前处于正常状态；双击空格开始飞行。";
-
-            return;
-        }
-
-        SetActiveFlight(
-            true
-        );
-
-        LastSucceeded =
-            true;
-
-        LastStatus =
-            "双击模式已关闭，已立即进入飞行状态。";
-    }
-
-    internal void SetScrollSpeedEnabled(
-        bool enabled)
-    {
-        _scrollSpeedEnabled =
-            enabled;
-
-        LastSucceeded =
-            true;
-
-        LastStatus =
-            enabled
-                ? "飞行中滚轮调速已开启。"
-                : "飞行中滚轮调速已关闭。";
-    }
-
-    internal void SetSlowFallEnabled(
-        bool enabled)
-    {
-        _slowFallEnabled =
-            enabled;
-
-        if (!enabled)
-        {
-            ClearSlowFallImmediately();
-        }
-
-        LastSucceeded =
-            true;
-
-        LastStatus =
-            enabled
-                ? "退出飞行保护已开启：1 秒无重力，随后缓降至第 5 秒。"
-                : "退出飞行保护已关闭。";
-    }
-
     internal void SetFlightSpeed(
         float speed)
     {
-        if (float.IsNaN(speed) ||
-            float.IsInfinity(speed))
+        if (float.IsNaN(
+                speed) ||
+            float.IsInfinity(
+                speed))
         {
             LastSucceeded =
                 false;
@@ -522,12 +257,6 @@ internal sealed class FlightService :
 
         _activeCharacter =
             null;
-
-        _flightPositionInitialized =
-            false;
-
-        _warpAccumulator =
-            0f;
     }
 
     private void EnableFlightSystem()
@@ -546,7 +275,8 @@ internal sealed class FlightService :
         Character? character =
             Character.localCharacter;
 
-        if (character is null)
+        if (character is null ||
+            !character.IsLocal)
         {
             LastSucceeded =
                 false;
@@ -560,6 +290,9 @@ internal sealed class FlightService :
         StatusService statusService =
             StatusRuntime.Service;
 
+        /*
+         * 保存进入飞行系统前的状态。
+         */
         _savedInvincible =
             statusService.Invincible;
 
@@ -578,13 +311,26 @@ internal sealed class FlightService :
             force: true
         );
 
+        /*
+         * 物理式飞行会对角色施加力。
+         *
+         * 飞行系统启用期间关闭防击退，
+         * 避免防击退补丁抵消飞行作用力。
+         */
         statusService.SetAntiKnockback(
-            true,
+            false,
             force: true
+        );
+
+        EnsureFlightController(
+            character
         );
 
         _enabled =
             true;
+
+        _activelyFlying =
+            false;
 
         _activeCharacter =
             character;
@@ -592,42 +338,14 @@ internal sealed class FlightService :
         _lastSpacePressTime =
             -100f;
 
-        _warpAccumulator =
-            0f;
-
-        _flightPositionInitialized =
-            false;
-
-        if (_doubleTapMode)
-        {
-            _activelyFlying =
-                false;
-
-            LastSucceeded =
-                true;
-
-            LastStatus =
-                "飞行总开关已开启。双击空格开始飞行。";
-
-            Plugin.Log.LogInfo(
-                "Flight system enabled in double-tap standby mode."
-            );
-
-            return;
-        }
-
-        SetActiveFlight(
-            true
-        );
-
         LastSucceeded =
             true;
 
         LastStatus =
-            "飞行总开关已开启，已进入坐标飞行状态。";
+            "飞行总开关已开启。双击空格开始飞行。";
 
         Plugin.Log.LogInfo(
-            "Flight system enabled and coordinate flight activated."
+            "Flight system enabled in standby mode."
         );
     }
 
@@ -649,24 +367,14 @@ internal sealed class FlightService :
         _activeCharacter =
             null;
 
-        _flightPosition =
-            Vector3.zero;
-
-        _flightPositionInitialized =
-            false;
-
         _lastSpacePressTime =
             -100f;
 
-        _warpAccumulator =
-            0f;
-
         /*
-         * 如果关闭总开关时仍处于实际飞行状态，
-         * 同样给予退出飞行保护。
+         * 关闭总开关时如果仍在飞行，
+         * 固定给予退出飞行缓降。
          */
         if (wasActivelyFlying &&
-            _slowFallEnabled &&
             character is not null &&
             character.IsLocal)
         {
@@ -712,13 +420,12 @@ internal sealed class FlightService :
             true;
 
         LastStatus =
-            wasActivelyFlying &&
-            _slowFallEnabled
+            wasActivelyFlying
                 ? "飞行已关闭，已恢复此前状态，并获得 1 秒无重力和总计 5 秒缓降保护。"
                 : "飞行已关闭，并已恢复此前的无敌与防击退状态。";
 
         Plugin.Log.LogInfo(
-            "Coordinate flight system disabled."
+            "Physical flight system disabled."
         );
     }
 
@@ -730,7 +437,8 @@ internal sealed class FlightService :
             return;
         }
 
-        if (_activelyFlying == active)
+        if (_activelyFlying ==
+            active)
         {
             return;
         }
@@ -753,15 +461,15 @@ internal sealed class FlightService :
             }
 
             /*
-             * 如果上一次退出保护仍在生效，
-             * 重新进入飞行时先恢复原始重力状态。
+             * 重新进入飞行时，
+             * 先结束上一次退出缓降。
              */
             ClearSlowFallImmediately();
 
             _activeCharacter =
                 character;
 
-            InitializeFlightPosition(
+            EnsureFlightController(
                 character
             );
 
@@ -772,38 +480,14 @@ internal sealed class FlightService :
                 character
             );
 
-            if (!TryWarpCharacter(
-                    character,
-                    _flightPosition,
-                    out string error))
-            {
-                _activelyFlying =
-                    false;
-
-                _flightPositionInitialized =
-                    false;
-
-                _warpAccumulator =
-                    0f;
-
-                LastSucceeded =
-                    false;
-
-                LastStatus =
-                    $"无法开始飞行：{error}";
-
-                return;
-            }
-
             LastSucceeded =
                 true;
 
             LastStatus =
-                "已进入坐标飞行状态。";
+                "已进入物理飞行状态。";
 
             Plugin.Log.LogInfo(
-                $"Coordinate flight enabled at " +
-                $"{_flightPosition}."
+                "Physical flight enabled."
             );
 
             return;
@@ -812,20 +496,11 @@ internal sealed class FlightService :
         _activelyFlying =
             false;
 
-        _flightPositionInitialized =
-            false;
-
-        _warpAccumulator =
-            0f;
-
         /*
-         * 离开坐标飞行时：
-         *
-         * 前 1 秒无重力，
-         * 随后缓降至第 5 秒。
+         * 每次退出实际飞行，
+         * 固定给予 1 秒无重力和总计 5 秒缓降。
          */
-        if (_slowFallEnabled &&
-            character is not null &&
+        if (character is not null &&
             character.IsLocal)
         {
             RefreshSlowFall(
@@ -837,44 +512,32 @@ internal sealed class FlightService :
             true;
 
         LastStatus =
-            _slowFallEnabled
-                ? "已退出飞行：获得 1 秒无重力和总计 5 秒缓降保护。"
-                : "已恢复正常状态；双击空格可再次飞行。";
+            "已退出飞行：获得 1 秒无重力和总计 5 秒缓降保护。";
 
         Plugin.Log.LogInfo(
-            "Coordinate flight disabled."
+            "Physical flight disabled."
         );
     }
 
-    private void InitializeFlightPosition(
+    private static void EnsureFlightController(
         Character character)
     {
-        Vector3 resolvedPosition =
-            ResolveCharacterWorldPosition(
-                character
-            );
+        FlightController? controller =
+            character.GetComponent<
+                FlightController>();
 
-        if (!IsFinitePosition(
-                resolvedPosition))
+        if (controller is not null)
         {
-            resolvedPosition =
-                character
-                    .transform
-                    .position;
+            return;
         }
 
-        _flightPosition =
-            resolvedPosition;
-
-        _flightPositionInitialized =
-            true;
-
-        _warpAccumulator =
-            0f;
+        character.gameObject
+            .AddComponent<
+                FlightController>();
 
         Plugin.Log.LogInfo(
-            $"Initialized flight position: " +
-            $"{_flightPosition}."
+            $"FlightController added to " +
+            $"{character.name} by FlightService."
         );
     }
 
@@ -915,7 +578,8 @@ internal sealed class FlightService :
                 .mouseScrollDelta
                 .y;
 
-        if (Mathf.Abs(scroll) <
+        if (Mathf.Abs(
+                scroll) <
             0.01f)
         {
             return;
@@ -958,10 +622,10 @@ internal sealed class FlightService :
         Character character)
     {
         /*
-         * 先恢复上一次保护保存的状态，
-         * 避免重复应用后保存错误的 useGravity 值。
+         * 恢复上一次缓降保存的状态，
+         * 避免重复进入后保存错误重力。
          */
-        RestoreGravityStates();
+        RestoreSlowFallGravityStates();
 
         float currentTime =
             Time.unscaledTime;
@@ -989,7 +653,7 @@ internal sealed class FlightService :
                 continue;
             }
 
-            _savedGravityStates[
+            _slowFallGravityStates[
                 rigidbody
             ] =
                 rigidbody.useGravity;
@@ -998,12 +662,13 @@ internal sealed class FlightService :
                 false;
 
             /*
-             * 清除退出飞行瞬间残留的向下速度。
+             * 清除退出飞行瞬间的向下速度。
              */
             Vector3 velocity =
                 rigidbody.linearVelocity;
 
-            if (velocity.y < 0f)
+            if (velocity.y <
+                0f)
             {
                 velocity.y =
                     0f;
@@ -1014,7 +679,7 @@ internal sealed class FlightService :
         }
 
         _slowFallWasApplied =
-            _savedGravityStates.Count >
+            _slowFallGravityStates.Count >
             0;
 
         if (!_slowFallWasApplied)
@@ -1033,8 +698,7 @@ internal sealed class FlightService :
             $"{ZeroGravityDuration:0.##} seconds " +
             $"zero gravity and " +
             $"{SlowFallDuration:0.##} seconds " +
-            $"total slow fall to " +
-            $"{_savedGravityStates.Count} rigidbodies."
+            $"total slow fall."
         );
     }
 
@@ -1045,17 +709,11 @@ internal sealed class FlightService :
             return;
         }
 
-        if (!_slowFallEnabled)
-        {
-            ClearSlowFallImmediately();
-            return;
-        }
-
         float currentTime =
             Time.unscaledTime;
 
         /*
-         * 总计 5 秒结束后恢复全部原始重力状态。
+         * 总计 5 秒结束后恢复原始重力。
          */
         if (currentTime >=
             _slowFallUntil)
@@ -1071,7 +729,7 @@ internal sealed class FlightService :
         foreach (
             KeyValuePair<Rigidbody, bool>
                 entry
-            in _savedGravityStates
+            in _slowFallGravityStates
                 .ToArray())
         {
             Rigidbody rigidbody =
@@ -1080,7 +738,7 @@ internal sealed class FlightService :
             if (!IsUsableRigidbody(
                     rigidbody))
             {
-                _savedGravityStates.Remove(
+                _slowFallGravityStates.Remove(
                     rigidbody
                 );
 
@@ -1099,7 +757,8 @@ internal sealed class FlightService :
                 Vector3 velocity =
                     rigidbody.linearVelocity;
 
-                if (velocity.y < 0f)
+                if (velocity.y <
+                    0f)
                 {
                     velocity.y =
                         0f;
@@ -1112,8 +771,8 @@ internal sealed class FlightService :
             }
 
             /*
-             * 第 1～5 秒恢复该刚体原本的重力状态，
-             * 但限制最大向下速度，形成缓降。
+             * 第 1～5 秒恢复原始重力，
+             * 但限制最大下落速度。
              */
             rigidbody.useGravity =
                 entry.Value;
@@ -1132,7 +791,7 @@ internal sealed class FlightService :
             }
         }
 
-        if (_savedGravityStates.Count >
+        if (_slowFallGravityStates.Count >
             0)
         {
             return;
@@ -1150,7 +809,7 @@ internal sealed class FlightService :
 
     private void ClearSlowFallImmediately()
     {
-        RestoreGravityStates();
+        RestoreSlowFallGravityStates();
 
         _zeroGravityUntil =
             0f;
@@ -1162,12 +821,12 @@ internal sealed class FlightService :
             false;
     }
 
-    private void RestoreGravityStates()
+    private void RestoreSlowFallGravityStates()
     {
         foreach (
             KeyValuePair<Rigidbody, bool>
                 entry
-            in _savedGravityStates
+            in _slowFallGravityStates
                 .ToArray())
         {
             Rigidbody rigidbody =
@@ -1186,274 +845,13 @@ internal sealed class FlightService :
             catch (Exception exception)
             {
                 Plugin.Log.LogDebug(
-                    $"Failed to restore rigidbody " +
+                    $"Failed to restore slow-fall " +
                     $"gravity: {exception.Message}"
                 );
             }
         }
 
-        _savedGravityStates.Clear();
-    }
-
-    private static Vector3
-        ReadMovementDirection(
-            Character character)
-    {
-        Camera? camera =
-            Camera.main;
-
-        Vector3 forward;
-        Vector3 right;
-
-        if (camera is not null)
-        {
-            forward =
-                camera.transform.forward;
-
-            right =
-                camera.transform.right;
-        }
-        else
-        {
-            forward =
-                character.transform.forward;
-
-            right =
-                character.transform.right;
-        }
-
-        forward.y =
-            0f;
-
-        right.y =
-            0f;
-
-        if (forward.sqrMagnitude <
-            0.001f)
-        {
-            forward =
-                Vector3.forward;
-        }
-
-        if (right.sqrMagnitude <
-            0.001f)
-        {
-            right =
-                Vector3.right;
-        }
-
-        forward.Normalize();
-        right.Normalize();
-
-        Vector3 movement =
-            Vector3.zero;
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.W))
-        {
-            movement +=
-                forward;
-        }
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.S))
-        {
-            movement -=
-                forward;
-        }
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.D))
-        {
-            movement +=
-                right;
-        }
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.A))
-        {
-            movement -=
-                right;
-        }
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.Space))
-        {
-            movement +=
-                Vector3.up;
-        }
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.LeftControl) ||
-            UnityEngine.Input.GetKey(
-                KeyCode.RightControl))
-        {
-            movement +=
-                Vector3.down;
-        }
-
-        return movement;
-    }
-
-    private static bool TryWarpCharacter(
-        Character character,
-        Vector3 destination,
-        out string error)
-    {
-        error =
-            string.Empty;
-
-        PhotonView? photonView =
-            character.photonView;
-
-        if (photonView is null)
-        {
-            error =
-                "角色 PhotonView 不存在。";
-
-            return false;
-        }
-
-        if (!IsFinitePosition(
-                destination))
-        {
-            error =
-                "目标坐标无效。";
-
-            return false;
-        }
-
-        try
-        {
-            photonView.RPC(
-                "WarpPlayerRPC",
-                RpcTarget.All,
-                destination,
-                false
-            );
-
-            return true;
-        }
-        catch (Exception exception)
-        {
-            error =
-                exception.Message;
-
-            Plugin.Log.LogError(
-                $"Flight WarpPlayerRPC failed: " +
-                $"{exception}"
-            );
-
-            return false;
-        }
-    }
-
-    private static Vector3
-        ResolveCharacterWorldPosition(
-            Character character)
-    {
-        Rigidbody[] rigidbodies =
-            character.GetComponentsInChildren<
-                Rigidbody>(
-                    true
-                );
-
-        if (rigidbodies.Length ==
-            0)
-        {
-            return character
-                .transform
-                .position;
-        }
-
-        string[] preferredNames =
-        {
-            "hip",
-            "hips",
-            "pelvis",
-            "torso",
-            "chest",
-            "body"
-        };
-
-        foreach (string preferredName
-                 in preferredNames)
-        {
-            foreach (Rigidbody rigidbody
-                     in rigidbodies)
-            {
-                if (!IsUsableRigidbody(
-                        rigidbody))
-                {
-                    continue;
-                }
-
-                string bodyName =
-                    rigidbody.name ??
-                    string.Empty;
-
-                if (!bodyName.Contains(
-                        preferredName,
-                        StringComparison
-                            .OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                Vector3 position =
-                    rigidbody
-                        .worldCenterOfMass;
-
-                if (IsFinitePosition(
-                        position))
-                {
-                    return position;
-                }
-            }
-        }
-
-        Vector3 positionSum =
-            Vector3.zero;
-
-        int validCount =
-            0;
-
-        foreach (Rigidbody rigidbody
-                 in rigidbodies)
-        {
-            if (!IsUsableRigidbody(
-                    rigidbody))
-            {
-                continue;
-            }
-
-            Vector3 position =
-                rigidbody
-                    .worldCenterOfMass;
-
-            if (!IsFinitePosition(
-                    position))
-            {
-                continue;
-            }
-
-            positionSum +=
-                position;
-
-            validCount++;
-        }
-
-        if (validCount >
-            0)
-        {
-            return
-                positionSum /
-                validCount;
-        }
-
-        return character
-            .transform
-            .position;
+        _slowFallGravityStates.Clear();
     }
 
     private static bool IsUsableRigidbody(
@@ -1471,18 +869,6 @@ internal sealed class FlightService :
             gameObject is not null &&
             gameObject.scene.IsValid() &&
             gameObject.activeInHierarchy;
-    }
-
-    private static bool IsFinitePosition(
-        Vector3 position)
-    {
-        return
-            !float.IsNaN(position.x) &&
-            !float.IsNaN(position.y) &&
-            !float.IsNaN(position.z) &&
-            !float.IsInfinity(position.x) &&
-            !float.IsInfinity(position.y) &&
-            !float.IsInfinity(position.z);
     }
 
     private static void TryResetFalling(
@@ -1527,10 +913,14 @@ internal sealed class FlightService :
             );
         }
 
-        if (!service.AntiKnockback)
+        /*
+         * 物理式飞行期间保持防击退关闭，
+         * 避免防击退补丁移除飞行作用力。
+         */
+        if (service.AntiKnockback)
         {
             service.SetAntiKnockback(
-                true,
+                false,
                 force: true
             );
         }
