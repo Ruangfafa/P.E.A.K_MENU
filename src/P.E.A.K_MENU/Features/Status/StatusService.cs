@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using Photon.Pun;
 using P.E.A.K_MENU.Patches;
 using UnityEngine;
 
@@ -374,6 +375,152 @@ internal sealed class StatusService :
             showResult: true
         );
     }
+    
+    internal void ReviveSelf()
+{
+    Character? character =
+        Character.localCharacter;
+
+    if (character is null ||
+        !character.IsLocal)
+    {
+        Fail(
+            "未找到本地玩家，请先进入关卡。"
+        );
+
+        return;
+    }
+
+    PhotonView? photonView =
+        character.photonView;
+
+    if (photonView is null)
+    {
+        Fail(
+            "本地角色 PhotonView 不存在，无法复活。"
+        );
+
+        return;
+    }
+
+    bool isDead;
+
+    try
+    {
+        isDead =
+            character.data.dead;
+    }
+    catch (Exception exception)
+    {
+        Fail(
+            $"无法读取角色死亡状态：{exception.Message}"
+        );
+
+        return;
+    }
+
+    if (!isDead)
+    {
+        LastSucceeded =
+            false;
+
+        LastStatus =
+            "当前角色没有死亡，不需要复活。";
+
+        return;
+    }
+
+    Vector3 revivePosition;
+
+    try
+    {
+        /*
+         * 死亡后优先使用幽灵当前位置。
+         */
+        if (character.Ghost is not null)
+        {
+            revivePosition =
+                character
+                    .Ghost
+                    .transform
+                    .position;
+        }
+        else
+        {
+            revivePosition =
+                character.Head;
+
+            if (!IsFiniteVector(
+                    revivePosition))
+            {
+                revivePosition =
+                    character
+                        .transform
+                        .position;
+            }
+        }
+
+        /*
+         * 避免复活后卡在地面或尸体中。
+         */
+        revivePosition +=
+            Vector3.up *
+            4f;
+
+        if (!IsFiniteVector(
+                revivePosition))
+        {
+            Fail(
+                "计算出的复活位置无效。"
+            );
+
+            return;
+        }
+
+        /*
+         * 当前 PEAK 版本的复活 RPC
+         * 使用三个参数：
+         *
+         * Vector3 position
+         * bool applyStatusPenalty
+         * int sourceItem
+         *
+         * -1 表示没有复活物品来源。
+         */
+        photonView.RPC(
+            "RPCA_ReviveAtPosition",
+            RpcTarget.All,
+            new object[]
+            {
+                revivePosition,
+                false,
+                -1
+            }
+        );
+
+        LastSucceeded =
+            true;
+
+        LastStatus =
+            "已执行复活自己的请求。";
+
+        Plugin.Log.LogInfo(
+            $"Self revive requested at " +
+            $"{revivePosition} with current " +
+            $"three-argument RPC signature."
+        );
+    }
+    catch (Exception exception)
+    {
+        Fail(
+            $"复活失败：{exception.GetBaseException().Message}"
+        );
+
+        Plugin.Log.LogError(
+            $"Self revive failed: {exception}"
+        );
+    }
+}
 
     internal void SetWeightOverride(
         bool enabled)
@@ -1737,6 +1884,24 @@ internal sealed class StatusService :
             !float.IsInfinity(value);
     }
 
+    private static bool IsFiniteVector(
+        Vector3 value)
+    {
+        return
+            !float.IsNaN(
+                value.x) &&
+            !float.IsNaN(
+                value.y) &&
+            !float.IsNaN(
+                value.z) &&
+            !float.IsInfinity(
+                value.x) &&
+            !float.IsInfinity(
+                value.y) &&
+            !float.IsInfinity(
+                value.z);
+    }
+    
     private static void LogRuntimeMembers()
     {
         Plugin.Log.LogInfo(

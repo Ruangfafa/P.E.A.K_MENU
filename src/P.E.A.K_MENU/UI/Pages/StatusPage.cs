@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Globalization;
 using P.E.A.K_MENU.Features.Status;
 using UnityEngine;
@@ -8,21 +7,13 @@ namespace P.E.A.K_MENU.UI.Pages;
 internal sealed class StatusPage :
     IMenuPage
 {
-    private const float SpecialEffectsHeight =
-        400f;
-
-    private readonly Dictionary<string, string>
-        _amountInputs = new();
-
-    private readonly Dictionary<string, string>
-        _durationInputs = new();
-
     private Vector2 _pageScroll;
-    private Vector2 _specialEffectsScroll;
 
-    private string _weightInput = "0";
+    private string _weightInput =
+        "0";
 
-    public string Title => "状态";
+    public string Title =>
+        "状态";
 
     public void Draw(
         MenuStyles styles)
@@ -39,10 +30,6 @@ internal sealed class StatusPage :
 
         StatusService service =
             StatusRuntime.Service;
-
-        EnsureInputsExist(
-            service
-        );
 
         _pageScroll =
             GUILayout.BeginScrollView(
@@ -67,7 +54,7 @@ internal sealed class StatusPage :
 
         GUILayout.Space(14f);
 
-        DrawClearEffects(
+        DrawRevive(
             service,
             styles
         );
@@ -80,13 +67,6 @@ internal sealed class StatusPage :
         );
 
         GUILayout.Space(16f);
-
-        DrawSpecialEffects(
-            service,
-            styles
-        );
-
-        GUILayout.Space(12f);
 
         GUILayout.Label(
             service.LastStatus,
@@ -103,15 +83,15 @@ internal sealed class StatusPage :
         MenuStyles styles)
     {
         GUILayout.Label(
-            "无敌",
+            "角色保护",
             styles.Label
         );
 
         GUILayout.Space(4f);
 
         /*
-         * 飞行总开关开启时，
-         * 禁止用户修改无敌。
+         * 飞行总开关开启期间，
+         * 无敌状态由飞行功能管理。
          */
         GUI.enabled =
             !service.FlightProtectionLock;
@@ -124,7 +104,8 @@ internal sealed class StatusPage :
                 GUILayout.Height(40f)
             );
 
-        GUI.enabled = true;
+        GUI.enabled =
+            true;
 
         if (!service.FlightProtectionLock &&
             invincible !=
@@ -136,8 +117,8 @@ internal sealed class StatusPage :
         }
 
         /*
-         * 防击退只有在无敌开启、
-         * 且没有被飞行锁定时才允许修改。
+         * 防击退只有在无敌开启，
+         * 且没有被飞行功能锁定时才能修改。
          */
         GUI.enabled =
             service.Invincible &&
@@ -151,7 +132,8 @@ internal sealed class StatusPage :
                 GUILayout.Height(40f)
             );
 
-        GUI.enabled = true;
+        GUI.enabled =
+            true;
 
         if (!service.FlightProtectionLock &&
             antiKnockback !=
@@ -165,7 +147,7 @@ internal sealed class StatusPage :
         if (service.FlightProtectionLock)
         {
             GUILayout.Label(
-                "飞行总开关开启期间，无敌与防击退已被强制开启并锁定。",
+                "飞行总开关开启期间，角色保护状态由飞行功能管理。",
                 styles.MutedLabel
             );
 
@@ -173,7 +155,7 @@ internal sealed class StatusPage :
         }
 
         GUILayout.Label(
-            "附加保护默认开启，关闭后仍保留死亡保护。",
+            "防击退需要先开启无敌。",
             styles.MutedLabel
         );
     }
@@ -206,24 +188,31 @@ internal sealed class StatusPage :
         }
     }
 
-    private static void DrawClearEffects(
+    private static void DrawRevive(
         StatusService service,
         MenuStyles styles)
     {
         GUILayout.Label(
-            "状态清理",
+            "死亡恢复",
             styles.Label
         );
 
         GUILayout.Space(4f);
 
         if (GUILayout.Button(
-                "清除所有负面效果",
+                "复活自己",
                 styles.ActionButton,
-                GUILayout.Height(40f)))
+                GUILayout.Height(42f)))
         {
-            service.ClearNegativeEffects();
+            service.ReviveSelf();
         }
+
+        GUILayout.Space(4f);
+
+        GUILayout.Label(
+            "仅在本地角色已经死亡后生效，复活位置优先使用幽灵当前位置。",
+            styles.MutedLabel
+        );
     }
 
     private void DrawWeight(
@@ -253,6 +242,11 @@ internal sealed class StatusPage :
             );
         }
 
+        GUILayout.Space(4f);
+
+        GUI.enabled =
+            service.WeightOverrideEnabled;
+
         GUILayout.BeginHorizontal();
 
         _weightInput =
@@ -268,18 +262,15 @@ internal sealed class StatusPage :
                 GUILayout.Width(76f),
                 GUILayout.Height(36f)))
         {
-            if (TryParseNumber(
-                    _weightInput,
-                    "负重",
-                    out float weight))
-            {
-                service.SetWeight(
-                    weight
-                );
-            }
+            ApplyWeight(
+                service
+            );
         }
 
         GUILayout.EndHorizontal();
+
+        GUI.enabled =
+            true;
 
         GUILayout.Label(
             "输入 0 可实现无负重。",
@@ -287,373 +278,40 @@ internal sealed class StatusPage :
         );
     }
 
-    private void DrawSpecialEffects(
-        StatusService service,
-        MenuStyles styles)
-    {
-        GUILayout.Label(
-            "特殊状态合集",
-            styles.Label
-        );
-
-        GUILayout.Space(4f);
-
-        GUILayout.Label(
-            "每种状态会根据自身机制显示持有量、持续时间或两者。",
-            styles.MutedLabel
-        );
-
-        GUILayout.Space(6f);
-
-        _specialEffectsScroll =
-            GUILayout.BeginScrollView(
-                _specialEffectsScroll,
-                false,
-                true,
-                GUILayout.Height(
-                    SpecialEffectsHeight
-                ),
-                GUILayout.ExpandWidth(true)
-            );
-
-        foreach (StatusEffectDefinition effect
-                 in service.SpecialEffects)
-        {
-            DrawEffectPanel(
-                service,
-                effect,
-                styles
-            );
-
-            GUILayout.Space(10f);
-        }
-
-        GUILayout.EndScrollView();
-    }
-
-    private void DrawEffectPanel(
-        StatusService service,
-        StatusEffectDefinition effect,
-        MenuStyles styles)
-    {
-        GUILayout.BeginVertical();
-
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label(
-            effect.DisplayName,
-            styles.Label,
-            GUILayout.ExpandWidth(true),
-            GUILayout.Height(30f)
-        );
-
-        if (effect.StatusType.HasValue &&
-            service.TryReadStatus(
-                effect,
-                out float currentValue))
-        {
-            GUILayout.Label(
-                $"当前：{currentValue:0.###}",
-                styles.MutedLabel,
-                GUILayout.Width(110f),
-                GUILayout.Height(30f)
-            );
-        }
-
-        GUILayout.EndHorizontal();
-
-        GUILayout.Label(
-            effect.Description,
-            styles.MutedLabel
-        );
-
-        GUILayout.Space(5f);
-
-        if (effect.ShowAmount)
-        {
-            DrawAmountInput(
-                effect,
-                styles
-            );
-
-            GUILayout.Space(4f);
-        }
-
-        if (effect.ShowDuration)
-        {
-            DrawDurationInput(
-                effect,
-                styles
-            );
-
-            GUILayout.Space(4f);
-        }
-
-        if (effect.Kind ==
-            StatusEffectKind.GameStatus)
-        {
-            DrawApplyModeButtons(
-                service,
-                effect,
-                styles
-            );
-        }
-
-        GUILayout.EndVertical();
-    }
-
-    private void DrawAmountInput(
-        StatusEffectDefinition effect,
-        MenuStyles styles)
-    {
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label(
-            "持有量",
-            styles.MutedLabel,
-            GUILayout.Width(72f),
-            GUILayout.Height(34f)
-        );
-
-        _amountInputs[
-            effect.Id] =
-                GUILayout.TextField(
-                    _amountInputs[
-                        effect.Id],
-                    GUILayout.Height(34f),
-                    GUILayout.ExpandWidth(true)
-                );
-
-        GUILayout.EndHorizontal();
-    }
-
-    private void DrawDurationInput(
-        StatusEffectDefinition effect,
-        MenuStyles styles)
-    {
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label(
-            "持续秒数",
-            styles.MutedLabel,
-            GUILayout.Width(72f),
-            GUILayout.Height(34f)
-        );
-
-        _durationInputs[
-            effect.Id] =
-                GUILayout.TextField(
-                    _durationInputs[
-                        effect.Id],
-                    GUILayout.Height(34f),
-                    GUILayout.ExpandWidth(true)
-                );
-
-        GUILayout.EndHorizontal();
-    }
-
-    private void DrawApplyModeButtons(
-        StatusService service,
-        StatusEffectDefinition effect,
-        MenuStyles styles)
-    {
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label(
-            "操作",
-            styles.MutedLabel,
-            GUILayout.Width(72f),
-            GUILayout.Height(34f)
-        );
-
-        DrawApplyModeButton(
-            service,
-            effect,
-            StatusApplyMode.Add,
-            "增加",
-            styles
-        );
-
-        DrawApplyModeButton(
-            service,
-            effect,
-            StatusApplyMode.Subtract,
-            "减少",
-            styles
-        );
-
-        DrawApplyModeButton(
-            service,
-            effect,
-            StatusApplyMode.Set,
-            "设为",
-            styles
-        );
-
-        DrawApplyModeButton(
-            service,
-            effect,
-            StatusApplyMode.Clear,
-            "清零",
-            styles
-        );
-
-        GUILayout.EndHorizontal();
-    }
-
-    private void DrawApplyModeButton(
-        StatusService service,
-        StatusEffectDefinition effect,
-        StatusApplyMode mode,
-        string text,
-        MenuStyles styles)
-    {
-        if (GUILayout.Button(
-                text,
-                styles.ActionButton,
-                GUILayout.Height(34f),
-                GUILayout.ExpandWidth(true)))
-        {
-            ApplyEffect(
-                service,
-                effect,
-                mode
-            );
-        }
-    }
-
-    private void ApplyEffect(
-        StatusService service,
-        StatusEffectDefinition effect,
-        StatusApplyMode applyMode)
-    {
-        float amount =
-            effect.DefaultAmount;
-
-        float duration =
-            effect.DefaultDuration;
-
-        if (effect.ShowAmount &&
-            applyMode !=
-            StatusApplyMode.Clear)
-        {
-            if (!TryParseNumber(
-                    _amountInputs[
-                        effect.Id],
-                    $"{effect.DisplayName}持有量",
-                    out amount))
-            {
-                return;
-            }
-        }
-
-        if (effect.ShowDuration &&
-            applyMode !=
-            StatusApplyMode.Clear)
-        {
-            if (!TryParseNumber(
-                    _durationInputs[
-                        effect.Id],
-                    $"{effect.DisplayName}持续时间",
-                    out duration))
-            {
-                return;
-            }
-
-            if (duration <= 0f)
-            {
-                service.SetInputError(
-                    "持续时间必须大于 0 秒。"
-                );
-
-                return;
-            }
-        }
-
-        if (applyMode ==
-            StatusApplyMode.Clear)
-        {
-            amount =
-                0f;
-
-            duration =
-                0f;
-        }
-
-        service.ApplySpecialEffect(
-            effect,
-            amount,
-            duration,
-            applyMode
-        );
-    }
-
-    private void EnsureInputsExist(
+    private void ApplyWeight(
         StatusService service)
-    {
-        foreach (StatusEffectDefinition effect
-                 in service.SpecialEffects)
-        {
-            if (!_amountInputs.ContainsKey(
-                    effect.Id))
-            {
-                _amountInputs[
-                    effect.Id] =
-                        effect
-                            .DefaultAmount
-                            .ToString(
-                                "0.###",
-                                CultureInfo
-                                    .InvariantCulture
-                            );
-            }
-
-            if (!_durationInputs.ContainsKey(
-                    effect.Id))
-            {
-                _durationInputs[
-                    effect.Id] =
-                        effect
-                            .DefaultDuration
-                            .ToString(
-                                "0.###",
-                                CultureInfo
-                                    .InvariantCulture
-                            );
-            }
-        }
-    }
-
-    private bool TryParseNumber(
-        string text,
-        string fieldName,
-        out float value)
     {
         bool parsed =
             float.TryParse(
-                text,
+                _weightInput,
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture,
-                out value
+                out float weight
             ) ||
             float.TryParse(
-                text,
+                _weightInput,
                 NumberStyles.Float,
                 CultureInfo.CurrentCulture,
-                out value
+                out weight
             );
 
         if (!parsed)
         {
-            StatusRuntime
-                .Service
-                .SetInputError(
-                    $"{fieldName}格式无效。"
-                );
+            service.SetInputError(
+                "负重格式无效。"
+            );
 
-            return false;
+            return;
         }
 
-        return true;
+        service.SetWeight(
+            weight
+        );
+
+        _weightInput =
+            weight.ToString(
+                "0.###",
+                CultureInfo.InvariantCulture
+            );
     }
 }
