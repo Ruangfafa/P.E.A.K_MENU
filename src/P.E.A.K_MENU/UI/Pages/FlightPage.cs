@@ -30,7 +30,14 @@ internal sealed class FlightPage :
             FlightRuntime.Service;
 
         GUILayout.Label(
-            "开启飞行总开关后，无敌与防击退会被强制开启并锁定。",
+            "开启飞行总开关后，将强制开启无敌，并暂时关闭防击退。",
+            styles.MutedLabel
+        );
+
+        GUILayout.Space(6f);
+
+        GUILayout.Label(
+            "双击空格、滚轮调速和退出缓降均为固定功能。",
             styles.MutedLabel
         );
 
@@ -49,56 +56,6 @@ internal sealed class FlightPage :
         {
             service.SetEnabled(
                 enabled
-            );
-        }
-
-        GUILayout.Space(8f);
-
-        bool doubleTapMode =
-            GUILayout.Toggle(
-                service.DoubleTapMode,
-                "双击空格切换实际飞行",
-                styles.Toggle,
-                GUILayout.Height(40f)
-            );
-
-        if (doubleTapMode !=
-            service.DoubleTapMode)
-        {
-            service.SetDoubleTapMode(
-                doubleTapMode
-            );
-        }
-
-        bool scrollSpeedEnabled =
-            GUILayout.Toggle(
-                service.ScrollSpeedEnabled,
-                "实际飞行中使用滚轮调整速度",
-                styles.Toggle,
-                GUILayout.Height(40f)
-            );
-
-        if (scrollSpeedEnabled !=
-            service.ScrollSpeedEnabled)
-        {
-            service.SetScrollSpeedEnabled(
-                scrollSpeedEnabled
-            );
-        }
-
-        bool slowFallEnabled =
-            GUILayout.Toggle(
-                service.SlowFallEnabled,
-                "每次坐标同步后续期五秒缓降",
-                styles.Toggle,
-                GUILayout.Height(40f)
-            );
-
-        if (slowFallEnabled !=
-            service.SlowFallEnabled)
-        {
-            service.SetSlowFallEnabled(
-                slowFallEnabled
             );
         }
 
@@ -141,7 +98,7 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "滚轮向上提高 5 点速度，滚轮向下降低 5 点速度。",
+            "实际飞行时，滚轮向上提高 5 点，滚轮向下降低 5 点。",
             styles.MutedLabel
         );
 
@@ -155,11 +112,9 @@ internal sealed class FlightPage :
         GUILayout.Space(4f);
 
         GUILayout.Label(
-            service.ActivelyFlying
-                ? "正在飞行"
-                : service.Enabled
-                    ? "正常状态 / 等待双击空格"
-                    : "飞行总开关未开启",
+            ResolveFlightStatus(
+                service
+            ),
             service.ActivelyFlying
                 ? styles.Label
                 : styles.MutedLabel
@@ -178,17 +133,23 @@ internal sealed class FlightPage :
             service.ToggleActiveFlight();
         }
 
-        GUI.enabled = true;
+        GUI.enabled =
+            true;
 
         GUILayout.Space(12f);
 
         GUILayout.Label(
-            "操作：WASD 移动，空格上升，Ctrl 下降，Shift 两倍加速。",
+            "操作：WASD 移动，空格上升，Ctrl 下降，Shift 加速。",
             styles.MutedLabel
         );
 
         GUILayout.Label(
-            "关闭实际飞行后，最后一次同步给予的缓降最多继续五秒。",
+            "双击空格可随时进入或退出实际飞行。",
+            styles.MutedLabel
+        );
+
+        GUILayout.Label(
+            "退出实际飞行后：前 1 秒无重力，总计 5 秒缓降。",
             styles.MutedLabel
         );
 
@@ -200,6 +161,25 @@ internal sealed class FlightPage :
                 ? styles.Label
                 : styles.MutedLabel
         );
+    }
+
+    private static string ResolveFlightStatus(
+        FlightService service)
+    {
+        if (!service.Enabled)
+        {
+            return
+                "飞行总开关未开启";
+        }
+
+        if (service.ActivelyFlying)
+        {
+            return
+                "正在飞行";
+        }
+
+        return
+            "正常状态 / 等待双击空格";
     }
 
     private void ApplySpeed(
