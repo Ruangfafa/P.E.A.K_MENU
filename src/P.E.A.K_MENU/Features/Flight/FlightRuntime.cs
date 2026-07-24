@@ -43,11 +43,6 @@ internal static class FlightRuntime
         _service?.Update();
     }
 
-    internal static void FixedUpdate()
-    {
-        _service?.FixedUpdate();
-    }
-
     internal static void Dispose()
     {
         _service?.Dispose();

@@ -97,11 +97,6 @@ public partial class Plugin :
         FlightRuntime.Update();
     }
 
-    private void FixedUpdate()
-    {
-        FlightRuntime.FixedUpdate();
-    }
-
     private void OnGUI()
     {
         _menuWindow.Draw();
