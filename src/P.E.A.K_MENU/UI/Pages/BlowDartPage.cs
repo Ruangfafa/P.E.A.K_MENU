@@ -7,14 +7,20 @@ namespace P.E.A.K_MENU.UI.Pages;
 internal sealed class BlowDartPage :
     IMenuPage
 {
+    /*
+     * UI 使用百分制。
+     *
+     * 底层默认值为 0.25，
+     * 页面显示为 25。
+     */
     private string _amountInput =
-        "0.25";
+        "25";
 
     /*
      * 防止页面每帧重复调用 SetAmount。
      */
     private string _lastProcessedAmountInput =
-        "0.25";
+        "25";
 
     private bool _amountInputInitialized;
 
@@ -36,6 +42,10 @@ internal sealed class BlowDartPage :
 
         BlowDartService service =
             BlowDartRuntime.Service;
+
+        EnsureAmountInputInitialized(
+            service
+        );
 
         GUILayout.Label(
             "仅房主使用时可稳定修改其他玩家的吹箭状态效果。",
@@ -83,9 +93,6 @@ internal sealed class BlowDartPage :
 
         GUILayout.Space(10f);
 
-        /*
-         * 获取吹箭按钮。
-         */
         if (GUILayout.Button(
                 "获取吹箭",
                 styles.ActionButton,
@@ -138,16 +145,17 @@ internal sealed class BlowDartPage :
         GUILayout.Space(14f);
 
         GUILayout.Label(
-            "效果强度",
+            "效果强度（百分比）",
             styles.Label
         );
 
         GUILayout.Space(4f);
 
         /*
-         * 不再显示“确定”按钮。
+         * UI 输入使用百分制。
          *
-         * 输入文本发生变化时立即尝试更新。
+         * 输入 25：
+         * 传给服务层的是 0.25。
          */
         string newAmountInput =
             GUILayout.TextField(
@@ -170,17 +178,18 @@ internal sealed class BlowDartPage :
         GUILayout.Space(5f);
 
         GUILayout.Label(
-            $"当前强度：{service.Amount:0.###}",
+            $"当前强度：" +
+            $"{ToPercentage(service.Amount):0.###}%",
             styles.MutedLabel
         );
 
         GUILayout.Label(
-            "输入有效数值后会自动更新，无需点击确定。",
+            "输入百分制数值后会自动更新，例如输入 25 等于底层数值 0.25。",
             styles.MutedLabel
         );
 
         GUILayout.Label(
-            "建议使用 0.10～0.30，状态值过高可能让目标立即倒下。",
+            "建议使用 10～30，数值过高可能让目标立即倒下。",
             styles.MutedLabel
         );
 
@@ -209,8 +218,13 @@ internal sealed class BlowDartPage :
             return;
         }
 
+        /*
+         * 底层 0.25 转换为 UI 的 25。
+         */
         _amountInput =
-            service.Amount.ToString(
+            ToPercentage(
+                service.Amount
+            ).ToString(
                 "0.###",
                 CultureInfo.InvariantCulture
             );
@@ -233,9 +247,6 @@ internal sealed class BlowDartPage :
 
         /*
          * 输入框暂时为空时不报错。
-         *
-         * 用户可能正在删除旧数值，
-         * 准备输入一个新数值。
          */
         if (string.IsNullOrWhiteSpace(
                 _amountInput))
@@ -243,12 +254,13 @@ internal sealed class BlowDartPage :
             return;
         }
 
-        /*
-         * 用户输入负数时，刚输入一个减号也不报错。
-         */
         string trimmed =
             _amountInput.Trim();
 
+        /*
+         * 用户可能还在输入小数，
+         * 这些临时内容不立即报错。
+         */
         if (trimmed == "-" ||
             trimmed == "+" ||
             trimmed == "." ||
@@ -261,35 +273,74 @@ internal sealed class BlowDartPage :
             return;
         }
 
+        /*
+         * 允许用户输入末尾百分号。
+         *
+         * 25 和 25% 都会被识别为 25%。
+         */
+        if (trimmed.EndsWith(
+                "%"))
+        {
+            trimmed =
+                trimmed
+                    .Substring(
+                        0,
+                        trimmed.Length - 1
+                    )
+                    .Trim();
+        }
+
         bool parsed =
             float.TryParse(
                 trimmed,
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture,
-                out float amount
+                out float percentage
             ) ||
             float.TryParse(
                 trimmed,
                 NumberStyles.Float,
                 CultureInfo.CurrentCulture,
-                out amount
+                out percentage
             );
 
         if (!parsed)
         {
-            /*
-             * 输入尚未完成时不覆盖当前有效强度，
-             * 也不持续输出错误信息。
-             */
             return;
         }
+
+        /*
+         * UI 百分制转换回底层 0～1 数值。
+         *
+         * 25 ÷ 100 = 0.25
+         */
+        float internalAmount =
+            FromPercentage(
+                percentage
+            );
 
         _lastProcessedAmountInput =
             _amountInput;
 
         service.SetAmount(
-            amount
+            internalAmount
         );
+    }
+
+    private static float ToPercentage(
+        float internalValue)
+    {
+        return
+            internalValue *
+            100f;
+    }
+
+    private static float FromPercentage(
+        float percentage)
+    {
+        return
+            percentage /
+            100f;
     }
 
     private static void DrawEffectDescription(
