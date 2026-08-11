@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using P.E.A.K_MENU.Features.Status;
+using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
 using UnityEngine;
 
@@ -159,18 +160,11 @@ internal sealed class FlightService :
             return;
         }
 
-        /*
-         * 滚轮调速固定启用。
-         */
-        if (_activelyFlying)
+        if (FeatureInputSettings
+            .DoubleTapFlightEnabled)
         {
-            ReadMouseWheelSpeed();
+            DetectDoubleSpace();
         }
-
-        /*
-         * 双击空格固定启用。
-         */
-        DetectDoubleSpace();
     }
 
     internal void SetEnabled(
@@ -223,6 +217,41 @@ internal sealed class FlightService :
         LastStatus =
             $"飞行速度已设为 " +
             $"{_flightSpeed:0.##}。";
+    }
+
+    internal void AdjustFlightSpeed(
+        float direction)
+    {
+        if (!_enabled ||
+            !_activelyFlying ||
+            Mathf.Approximately(direction, 0f))
+        {
+            return;
+        }
+
+        float previousSpeed =
+            _flightSpeed;
+
+        _flightSpeed = Mathf.Clamp(
+            _flightSpeed +
+            Mathf.Sign(direction) *
+            ScrollSpeedStep,
+            MinimumFlightSpeed,
+            MaximumFlightSpeed
+        );
+
+        if (Mathf.Approximately(
+                previousSpeed,
+                _flightSpeed))
+        {
+            return;
+        }
+
+        LastSucceeded = true;
+        LastStatus =
+            direction > 0f
+                ? $"提高飞行速度：{_flightSpeed:0.##}。"
+                : $"降低飞行速度：{_flightSpeed:0.##}。";
     }
 
     internal void ToggleActiveFlight()
@@ -594,6 +623,12 @@ internal sealed class FlightService :
             _lastSpacePressTime =
                 -100f;
 
+            if (!_activelyFlying)
+            {
+                _flightSpeed =
+                    DefaultFlightSpeed;
+            }
+
             ToggleActiveFlight();
 
             return;
@@ -601,53 +636,6 @@ internal sealed class FlightService :
 
         _lastSpacePressTime =
             currentTime;
-    }
-
-    private void ReadMouseWheelSpeed()
-    {
-        float scroll =
-            UnityEngine.Input
-                .mouseScrollDelta
-                .y;
-
-        if (Mathf.Abs(
-                scroll) <
-            0.01f)
-        {
-            return;
-        }
-
-        float direction =
-            Mathf.Sign(
-                scroll
-            );
-
-        float previousSpeed =
-            _flightSpeed;
-
-        _flightSpeed =
-            Mathf.Clamp(
-                _flightSpeed +
-                direction *
-                ScrollSpeedStep,
-                MinimumFlightSpeed,
-                MaximumFlightSpeed
-            );
-
-        if (Mathf.Approximately(
-                previousSpeed,
-                _flightSpeed))
-        {
-            return;
-        }
-
-        LastSucceeded =
-            true;
-
-        LastStatus =
-            direction > 0f
-                ? $"滚轮提高速度：{_flightSpeed:0.##}。"
-                : $"滚轮降低速度：{_flightSpeed:0.##}。";
     }
 
     private void RefreshSlowFall(

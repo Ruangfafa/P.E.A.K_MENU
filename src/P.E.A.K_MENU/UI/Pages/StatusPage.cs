@@ -1,5 +1,6 @@
 using System.Globalization;
 using P.E.A.K_MENU.Features.Status;
+using P.E.A.K_MENU.Input;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI.Pages;
@@ -11,6 +12,9 @@ internal sealed class StatusPage :
 
     private string _weightInput =
         "0";
+
+    private readonly ShortcutRebindControl
+        _shortcutRebind = new();
 
     public string Title =>
         "状态";
@@ -76,9 +80,11 @@ internal sealed class StatusPage :
         );
 
         GUILayout.EndScrollView();
+
+        _shortcutRebind.CaptureEvent();
     }
 
-    private static void DrawInvincibility(
+    private void DrawInvincibility(
         StatusService service,
         MenuStyles styles)
     {
@@ -93,6 +99,8 @@ internal sealed class StatusPage :
          * 实际飞行期间，
          * 无敌状态由飞行功能管理。
          */
+        GUILayout.BeginHorizontal();
+
         GUI.enabled =
             !service.FlightProtectionLock;
 
@@ -101,11 +109,19 @@ internal sealed class StatusPage :
                 service.Invincible,
                 "启用无敌",
                 styles.Toggle,
-                GUILayout.Height(40f)
+                GUILayout.Height(40f),
+                GUILayout.ExpandWidth(true)
             );
 
         GUI.enabled =
             true;
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ToggleInvincibility,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         if (!service.FlightProtectionLock &&
             invincible !=
@@ -120,6 +136,8 @@ internal sealed class StatusPage :
          * 防击退只有在无敌开启，
          * 且没有被飞行功能锁定时才能修改。
          */
+        GUILayout.BeginHorizontal();
+
         GUI.enabled =
             service.Invincible &&
             !service.FlightProtectionLock;
@@ -129,11 +147,19 @@ internal sealed class StatusPage :
                 service.AntiKnockback,
                 "阻止击退、摔倒与外力",
                 styles.Toggle,
-                GUILayout.Height(40f)
+                GUILayout.Height(40f),
+                GUILayout.ExpandWidth(true)
             );
 
         GUI.enabled =
             true;
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ToggleAntiKnockback,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         if (!service.FlightProtectionLock &&
             antiKnockback !=
@@ -160,7 +186,7 @@ internal sealed class StatusPage :
         );
     }
 
-    private static void DrawInfiniteStamina(
+    private void DrawInfiniteStamina(
         StatusService service,
         MenuStyles styles)
     {
@@ -171,13 +197,23 @@ internal sealed class StatusPage :
 
         GUILayout.Space(4f);
 
+        GUILayout.BeginHorizontal();
+
         bool enabled =
             GUILayout.Toggle(
                 service.InfiniteStamina,
                 "无限体力",
                 styles.Toggle,
-                GUILayout.Height(40f)
+                GUILayout.Height(40f),
+                GUILayout.ExpandWidth(true)
             );
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ToggleInfiniteStamina,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         if (enabled !=
             service.InfiniteStamina)
@@ -188,7 +224,7 @@ internal sealed class StatusPage :
         }
     }
 
-    private static void DrawRevive(
+    private void DrawRevive(
         StatusService service,
         MenuStyles styles)
     {
@@ -199,13 +235,23 @@ internal sealed class StatusPage :
 
         GUILayout.Space(4f);
 
+        GUILayout.BeginHorizontal();
+
         if (GUILayout.Button(
                 "复活自己",
                 styles.ActionButton,
-                GUILayout.Height(42f)))
+                GUILayout.Height(42f),
+                GUILayout.ExpandWidth(true)))
         {
             service.ReviveSelf();
         }
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ReviveSelf,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         GUILayout.Space(4f);
 
@@ -226,13 +272,23 @@ internal sealed class StatusPage :
 
         GUILayout.Space(4f);
 
+        GUILayout.BeginHorizontal();
+
         bool enabled =
             GUILayout.Toggle(
                 service.WeightOverrideEnabled,
                 "启用负重覆盖",
                 styles.Toggle,
-                GUILayout.Height(38f)
+                GUILayout.Height(38f),
+                GUILayout.ExpandWidth(true)
             );
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ToggleWeightOverride,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         if (enabled !=
             service.WeightOverrideEnabled)

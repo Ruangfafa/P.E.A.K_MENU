@@ -1,5 +1,6 @@
 using System.Globalization;
 using P.E.A.K_MENU.Features.Flight;
+using P.E.A.K_MENU.Input;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI.Pages;
@@ -9,6 +10,9 @@ internal sealed class FlightPage :
 {
     private string _speedInput =
         "16";
+
+    private readonly ShortcutRebindControl
+        _shortcutRebind = new();
 
     public string Title =>
         "飞行";
@@ -43,13 +47,23 @@ internal sealed class FlightPage :
 
         GUILayout.Space(12f);
 
+        GUILayout.BeginHorizontal();
+
         bool enabled =
             GUILayout.Toggle(
                 service.Enabled,
                 "启用飞行总开关",
                 styles.Toggle,
-                GUILayout.Height(40f)
+                GUILayout.Height(40f),
+                GUILayout.ExpandWidth(true)
             );
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ToggleFlightSystem,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         if (enabled !=
             service.Enabled)
@@ -58,6 +72,32 @@ internal sealed class FlightPage :
                 enabled
             );
         }
+
+        GUI.enabled = service.Enabled;
+
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(24f);
+
+        bool doubleTapEnabled =
+            GUILayout.Toggle(
+                FeatureInputSettings
+                    .DoubleTapFlightEnabled,
+                "允许双击空格进入或退出实际飞行",
+                styles.Toggle,
+                GUILayout.Height(36f),
+                GUILayout.ExpandWidth(true)
+            );
+
+        GUILayout.EndHorizontal();
+
+        if (doubleTapEnabled !=
+            FeatureInputSettings.DoubleTapFlightEnabled)
+        {
+            FeatureInputSettings.DoubleTapFlightEnabled =
+                doubleTapEnabled;
+        }
+
+        GUI.enabled = true;
 
         GUILayout.Space(12f);
 
@@ -98,8 +138,22 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "实际飞行时，滚轮向上提高 5 点，滚轮向下降低 5 点。",
+            "实际飞行时，每次提高或降低 5 点。",
             styles.MutedLabel
+        );
+
+        GUILayout.Space(6f);
+
+        DrawSpeedShortcutRow(
+            service,
+            styles,
+            increase: true
+        );
+
+        DrawSpeedShortcutRow(
+            service,
+            styles,
+            increase: false
         );
 
         GUILayout.Space(12f);
@@ -120,21 +174,30 @@ internal sealed class FlightPage :
                 : styles.MutedLabel
         );
 
-        GUI.enabled =
-            service.Enabled;
+        GUILayout.BeginHorizontal();
+
+        GUI.enabled = service.Enabled;
 
         if (GUILayout.Button(
                 service.ActivelyFlying
                     ? "退出实际飞行"
                     : "进入实际飞行",
                 styles.ActionButton,
-                GUILayout.Height(38f)))
+                GUILayout.Height(38f),
+                GUILayout.ExpandWidth(true)))
         {
             service.ToggleActiveFlight();
         }
 
         GUI.enabled =
             true;
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.ToggleActiveFlight,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         GUILayout.Space(12f);
 
@@ -144,7 +207,7 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "双击空格可随时进入或退出实际飞行。",
+            "启用子项后，双击空格可进入或退出实际飞行；进入时速度重置为 16。",
             styles.MutedLabel
         );
 
@@ -161,6 +224,46 @@ internal sealed class FlightPage :
                 ? styles.Label
                 : styles.MutedLabel
         );
+
+        _shortcutRebind.CaptureEvent();
+    }
+
+    private void DrawSpeedShortcutRow(
+        FlightService service,
+        MenuStyles styles,
+        bool increase)
+    {
+        GUILayout.BeginHorizontal();
+
+        GUI.enabled =
+            service.Enabled &&
+            service.ActivelyFlying;
+
+        if (GUILayout.Button(
+                increase
+                    ? "提高飞行速度"
+                    : "降低飞行速度",
+                styles.ActionButton,
+                GUILayout.Height(38f),
+                GUILayout.ExpandWidth(true)))
+        {
+            service.AdjustFlightSpeed(
+                increase ? 1f : -1f
+            );
+        }
+
+        GUI.enabled = true;
+
+        _shortcutRebind.DrawButtons(
+            increase
+                ? FeatureShortcutAction
+                    .IncreaseFlightSpeed
+                : FeatureShortcutAction
+                    .DecreaseFlightSpeed,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
     }
 
     private static string ResolveFlightStatus(

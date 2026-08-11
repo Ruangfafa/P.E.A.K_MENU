@@ -26,6 +26,9 @@ public partial class Plugin :
     private MenuInputController
         _inputController = null!;
 
+    private FeatureShortcutController
+        _featureShortcutController = null!;
+
     private Harmony
         _harmony = null!;
 
@@ -38,6 +41,7 @@ public partial class Plugin :
         );
 
         MenuSettings.Initialize(Config);
+        FeatureInputSettings.Initialize(Config);
         
         MenuIcons.Initialize();
 
@@ -75,6 +79,9 @@ public partial class Plugin :
                 _menuWindow
             );
 
+        _featureShortcutController =
+            new FeatureShortcutController();
+
         _harmony =
             new Harmony(
                 "ruangfafa.peakmenu"
@@ -91,6 +98,7 @@ public partial class Plugin :
     {
         _inputController.Update();
         _menuWindow.Update();
+        _featureShortcutController.Update();
 
         TeleportRuntime.Update();
         StatusRuntime.Update();

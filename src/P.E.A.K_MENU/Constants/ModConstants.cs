@@ -6,7 +6,7 @@ internal static class ModConstants
 {
     internal const int WindowId = 938421;
 
-    internal const float DefaultWindowWidth = 575f;
+    internal const float DefaultWindowWidth = 760f;
     internal const float DefaultWindowHeight = 850f;
 
     internal const float MinimumWindowWidth = 520f;
