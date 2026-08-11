@@ -6,6 +6,5 @@ internal enum MenuCategory
     Teleport,
     Flight,
     Status,
-    BlowDart,
     Settings
 }
