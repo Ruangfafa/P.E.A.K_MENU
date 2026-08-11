@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using P.E.A.K_MENU.Features.Status;
+using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
 using UnityEngine;
 
@@ -39,22 +40,16 @@ internal sealed class FlightService :
         5f;
 
     /*
-     * 退出飞行后的保护：
-     *
-     * 前 1 秒完全无重力；
-     * 总计 5 秒缓降。
+     * 退出飞行后提供 2 秒缓降。
      */
-    private const float ZeroGravityDuration =
-        1f;
-
     private const float SlowFallDuration =
-        5f;
+        2f;
 
     /*
      * 缓降阶段允许的最大向下速度。
      */
     private const float MaximumSlowFallSpeed =
-        -2.25f;
+        -6f;
 
     private bool _enabled;
     private bool _activelyFlying;
@@ -72,7 +67,6 @@ internal sealed class FlightService :
     private bool _hasSavedStatusState;
 
     private float _slowFallUntil;
-    private float _zeroGravityUntil;
 
     private bool _slowFallWasApplied;
 
@@ -118,7 +112,10 @@ internal sealed class FlightService :
             return;
         }
 
-        MaintainStatusProtection();
+        if (_activelyFlying)
+        {
+            MaintainStatusProtection();
+        }
 
         Character? character =
             Character.localCharacter;
@@ -163,18 +160,11 @@ internal sealed class FlightService :
             return;
         }
 
-        /*
-         * 滚轮调速固定启用。
-         */
-        if (_activelyFlying)
+        if (FeatureInputSettings
+            .DoubleTapFlightEnabled)
         {
-            ReadMouseWheelSpeed();
+            DetectDoubleSpace();
         }
-
-        /*
-         * 双击空格固定启用。
-         */
-        DetectDoubleSpace();
     }
 
     internal void SetEnabled(
@@ -227,6 +217,41 @@ internal sealed class FlightService :
         LastStatus =
             $"飞行速度已设为 " +
             $"{_flightSpeed:0.##}。";
+    }
+
+    internal void AdjustFlightSpeed(
+        float direction)
+    {
+        if (!_enabled ||
+            !_activelyFlying ||
+            Mathf.Approximately(direction, 0f))
+        {
+            return;
+        }
+
+        float previousSpeed =
+            _flightSpeed;
+
+        _flightSpeed = Mathf.Clamp(
+            _flightSpeed +
+            Mathf.Sign(direction) *
+            ScrollSpeedStep,
+            MinimumFlightSpeed,
+            MaximumFlightSpeed
+        );
+
+        if (Mathf.Approximately(
+                previousSpeed,
+                _flightSpeed))
+        {
+            return;
+        }
+
+        LastSucceeded = true;
+        LastStatus =
+            direction > 0f
+                ? $"提高飞行速度：{_flightSpeed:0.##}。"
+                : $"降低飞行速度：{_flightSpeed:0.##}。";
     }
 
     internal void ToggleActiveFlight()
@@ -286,41 +311,6 @@ internal sealed class FlightService :
 
             return;
         }
-
-        StatusService statusService =
-            StatusRuntime.Service;
-
-        /*
-         * 保存进入飞行系统前的状态。
-         */
-        _savedInvincible =
-            statusService.Invincible;
-
-        _savedAntiKnockback =
-            statusService.AntiKnockback;
-
-        _hasSavedStatusState =
-            true;
-
-        statusService.SetFlightProtectionLock(
-            true
-        );
-
-        statusService.SetInvincible(
-            true,
-            force: true
-        );
-
-        /*
-         * 物理式飞行会对角色施加力。
-         *
-         * 飞行系统启用期间关闭防击退，
-         * 避免防击退补丁抵消飞行作用力。
-         */
-        statusService.SetAntiKnockback(
-            false,
-            force: true
-        );
 
         EnsureFlightController(
             character
@@ -383,26 +373,9 @@ internal sealed class FlightService :
             );
         }
 
-        if (restoreStatusState &&
-            _hasSavedStatusState &&
-            StatusRuntime.IsInitialized)
+        if (restoreStatusState)
         {
-            StatusService statusService =
-                StatusRuntime.Service;
-
-            statusService.SetFlightProtectionLock(
-                false
-            );
-
-            statusService.SetInvincible(
-                _savedInvincible,
-                force: true
-            );
-
-            statusService.SetAntiKnockback(
-                _savedAntiKnockback,
-                force: true
-            );
+            RestoreStatusProtection();
         }
         else if (StatusRuntime.IsInitialized)
         {
@@ -421,8 +394,8 @@ internal sealed class FlightService :
 
         LastStatus =
             wasActivelyFlying
-                ? "飞行已关闭，已恢复此前状态，并获得 1 秒无重力和总计 5 秒缓降保护。"
-                : "飞行已关闭，并已恢复此前的无敌与防击退状态。";
+                ? "飞行已关闭，已恢复此前状态，并获得 2 秒缓降保护。"
+                : "飞行总开关已关闭。";
 
         Plugin.Log.LogInfo(
             "Physical flight system disabled."
@@ -457,6 +430,11 @@ internal sealed class FlightService :
                 LastStatus =
                     "未找到本地玩家，无法进入飞行状态。";
 
+                return;
+            }
+
+            if (!BeginStatusProtection())
+            {
                 return;
             }
 
@@ -496,9 +474,11 @@ internal sealed class FlightService :
         _activelyFlying =
             false;
 
+        RestoreStatusProtection();
+
         /*
          * 每次退出实际飞行，
-         * 固定给予 1 秒无重力和总计 5 秒缓降。
+         * 固定给予 2 秒缓降。
          */
         if (character is not null &&
             character.IsLocal)
@@ -512,11 +492,92 @@ internal sealed class FlightService :
             true;
 
         LastStatus =
-            "已退出飞行：获得 1 秒无重力和总计 5 秒缓降保护。";
+            "已退出飞行：获得 2 秒缓降保护。";
 
         Plugin.Log.LogInfo(
             "Physical flight disabled."
         );
+    }
+
+    private bool BeginStatusProtection()
+    {
+        if (!StatusRuntime.IsInitialized)
+        {
+            LastSucceeded =
+                false;
+
+            LastStatus =
+                "状态功能尚未初始化，无法进入飞行状态。";
+
+            return false;
+        }
+
+        StatusService statusService =
+            StatusRuntime.Service;
+
+        /*
+         * 每次进入实际飞行时保存当前保护状态，
+         * 退出实际飞行后原样恢复。
+         */
+        _savedInvincible =
+            statusService.Invincible;
+
+        _savedAntiKnockback =
+            statusService.AntiKnockback;
+
+        _hasSavedStatusState =
+            true;
+
+        statusService.SetFlightProtectionLock(
+            true
+        );
+
+        statusService.SetInvincible(
+            true,
+            force: true
+        );
+
+        /*
+         * 物理式飞行会对角色施加力，
+         * 因此实际飞行期间暂时关闭防击退。
+         */
+        statusService.SetAntiKnockback(
+            false,
+            force: true
+        );
+
+        return true;
+    }
+
+    private void RestoreStatusProtection()
+    {
+        if (!_hasSavedStatusState)
+        {
+            return;
+        }
+
+        if (StatusRuntime.IsInitialized)
+        {
+            StatusService statusService =
+                StatusRuntime.Service;
+
+            statusService.SetFlightProtectionLock(
+                false
+            );
+
+            statusService.SetInvincible(
+                _savedInvincible,
+                force: true
+            );
+
+            statusService.SetAntiKnockback(
+                _savedAntiKnockback,
+                force: true
+            );
+        }
+
+        _hasSavedStatusState =
+            false;
     }
 
     private static void EnsureFlightController(
@@ -562,6 +623,12 @@ internal sealed class FlightService :
             _lastSpacePressTime =
                 -100f;
 
+            if (!_activelyFlying)
+            {
+                _flightSpeed =
+                    DefaultFlightSpeed;
+            }
+
             ToggleActiveFlight();
 
             return;
@@ -569,53 +636,6 @@ internal sealed class FlightService :
 
         _lastSpacePressTime =
             currentTime;
-    }
-
-    private void ReadMouseWheelSpeed()
-    {
-        float scroll =
-            UnityEngine.Input
-                .mouseScrollDelta
-                .y;
-
-        if (Mathf.Abs(
-                scroll) <
-            0.01f)
-        {
-            return;
-        }
-
-        float direction =
-            Mathf.Sign(
-                scroll
-            );
-
-        float previousSpeed =
-            _flightSpeed;
-
-        _flightSpeed =
-            Mathf.Clamp(
-                _flightSpeed +
-                direction *
-                ScrollSpeedStep,
-                MinimumFlightSpeed,
-                MaximumFlightSpeed
-            );
-
-        if (Mathf.Approximately(
-                previousSpeed,
-                _flightSpeed))
-        {
-            return;
-        }
-
-        LastSucceeded =
-            true;
-
-        LastStatus =
-            direction > 0f
-                ? $"滚轮提高速度：{_flightSpeed:0.##}。"
-                : $"滚轮降低速度：{_flightSpeed:0.##}。";
     }
 
     private void RefreshSlowFall(
@@ -629,10 +649,6 @@ internal sealed class FlightService :
 
         float currentTime =
             Time.unscaledTime;
-
-        _zeroGravityUntil =
-            currentTime +
-            ZeroGravityDuration;
 
         _slowFallUntil =
             currentTime +
@@ -658,20 +674,18 @@ internal sealed class FlightService :
             ] =
                 rigidbody.useGravity;
 
-            rigidbody.useGravity =
-                false;
-
             /*
-             * 清除退出飞行瞬间的向下速度。
+             * 保留原始重力，仅限制退出飞行瞬间的
+             * 最大向下速度。
              */
             Vector3 velocity =
                 rigidbody.linearVelocity;
 
             if (velocity.y <
-                0f)
+                MaximumSlowFallSpeed)
             {
                 velocity.y =
-                    0f;
+                    MaximumSlowFallSpeed;
 
                 rigidbody.linearVelocity =
                     velocity;
@@ -684,9 +698,6 @@ internal sealed class FlightService :
 
         if (!_slowFallWasApplied)
         {
-            _zeroGravityUntil =
-                0f;
-
             _slowFallUntil =
                 0f;
 
@@ -695,10 +706,8 @@ internal sealed class FlightService :
 
         Plugin.Log.LogInfo(
             $"Flight exit protection applied: " +
-            $"{ZeroGravityDuration:0.##} seconds " +
-            $"zero gravity and " +
             $"{SlowFallDuration:0.##} seconds " +
-            $"total slow fall."
+            $"slow fall."
         );
     }
 
@@ -713,7 +722,7 @@ internal sealed class FlightService :
             Time.unscaledTime;
 
         /*
-         * 总计 5 秒结束后恢复原始重力。
+         * 2 秒结束后恢复正常下落。
          */
         if (currentTime >=
             _slowFallUntil)
@@ -721,10 +730,6 @@ internal sealed class FlightService :
             ClearSlowFallImmediately();
             return;
         }
-
-        bool zeroGravityActive =
-            currentTime <
-            _zeroGravityUntil;
 
         foreach (
             KeyValuePair<Rigidbody, bool>
@@ -745,34 +750,9 @@ internal sealed class FlightService :
                 continue;
             }
 
-            if (zeroGravityActive)
-            {
-                /*
-                 * 前 1 秒完全关闭重力，
-                 * 并阻止继续产生向下速度。
-                 */
-                rigidbody.useGravity =
-                    false;
-
-                Vector3 velocity =
-                    rigidbody.linearVelocity;
-
-                if (velocity.y <
-                    0f)
-                {
-                    velocity.y =
-                        0f;
-
-                    rigidbody.linearVelocity =
-                        velocity;
-                }
-
-                continue;
-            }
-
             /*
-             * 第 1～5 秒恢复原始重力，
-             * 但限制最大下落速度。
+             * 全程保留原始重力，
+             * 仅限制最大下落速度。
              */
             rigidbody.useGravity =
                 entry.Value;
@@ -797,9 +777,6 @@ internal sealed class FlightService :
             return;
         }
 
-        _zeroGravityUntil =
-            0f;
-
         _slowFallUntil =
             0f;
 
@@ -810,9 +787,6 @@ internal sealed class FlightService :
     private void ClearSlowFallImmediately()
     {
         RestoreSlowFallGravityStates();
-
-        _zeroGravityUntil =
-            0f;
 
         _slowFallUntil =
             0f;
@@ -914,7 +888,7 @@ internal sealed class FlightService :
         }
 
         /*
-         * 物理式飞行期间保持防击退关闭，
+         * 实际飞行期间保持防击退关闭，
          * 避免防击退补丁移除飞行作用力。
          */
         if (service.AntiKnockback)

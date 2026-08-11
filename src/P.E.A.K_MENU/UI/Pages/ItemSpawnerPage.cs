@@ -15,14 +15,29 @@ internal sealed class ItemSpawnerPage :
     private const float IconSize =
         40f;
 
-    private const float VisibleItemsListHeight =
-        200f;
+    private const float ManagementHeaderHeight =
+        22f;
 
-    private const float AddItemsListHeight =
-        180f;
+    private const float ManagementSearchHeight =
+        32f;
 
-    private const int MaximumSearchResults =
-        100;
+    private const float ManagementSectionSpacing =
+        10f;
+
+    private const float ManagementContentSpacing =
+        4f;
+
+    private const float ManagementSearchSpacing =
+        6f;
+
+    private const float ManagedItemRowHeight =
+        34f;
+
+    private const float AddItemRowHeight =
+        42f;
+
+    private const float ManagementScrollbarWidth =
+        20f;
 
     private Vector2 _spawnScroll;
     private Vector2 _manageScroll;
@@ -270,188 +285,329 @@ internal sealed class ItemSpawnerPage :
     }
 
     private void DrawManagement(
-    MenuStyles styles)
-{
-    GUILayout.Label(
-        "添加、删除或调整主列表的显示顺序。",
-        styles.MutedLabel
-    );
-
-    GUILayout.Space(8f);
-
-    /*
-     * 已显示物品区域。
-     */
-    GUILayout.Label(
-        "已显示物品",
-        styles.Label
-    );
-
-    GUILayout.Space(4f);
-
-    _manageScroll =
-        GUILayout.BeginScrollView(
-            _manageScroll,
-            false,
-            true,
-            GUILayout.Height(
-                VisibleItemsListHeight
-            ),
-            GUILayout.ExpandWidth(true)
-        );
-
-    IReadOnlyList<ItemSpawnEntry> visible =
-        ItemSpawnRuntime
-            .Catalog
-            .GetVisibleItems();
-
-    if (visible.Count == 0)
+        MenuStyles styles)
     {
         GUILayout.Label(
-            "当前没有显示任何物品。",
+            "添加、删除或调整主列表的显示顺序。",
             styles.MutedLabel
         );
-    }
-    else
-    {
-        /*
-         * 使用快照，避免点击删除或移动时
-         * 修改正在遍历的集合。
-         */
-        ItemSpawnEntry[] visibleSnapshot =
-            visible.ToArray();
 
-        foreach (ItemSpawnEntry entry
-                 in visibleSnapshot)
-        {
-            DrawManagedItemRow(
-                entry,
-                styles
+        GUILayout.Space(8f);
+
+        /*
+         * 先取得底部按钮之外的全部弹性空间，
+         * 再由 DrawManagementLists 明确按 50% / 50% 分配。
+         */
+        Rect managementListsRect =
+            GUILayoutUtility.GetRect(
+                0f,
+                float.MaxValue,
+                0f,
+                float.MaxValue,
+                GUILayout.ExpandWidth(true),
+                GUILayout.ExpandHeight(true)
             );
+
+        DrawManagementLists(
+            managementListsRect,
+            styles
+        );
+
+        GUILayout.Space(6f);
+
+        if (!string.IsNullOrWhiteSpace(
+                _managementStatus))
+        {
+            GUILayout.Label(
+                _managementStatus,
+                styles.MutedLabel
+            );
+
+            GUILayout.Space(4f);
+        }
+
+        /*
+         * 底部操作按钮不放入滚动区域，
+         * 始终保持可见。
+         */
+        if (GUILayout.Button(
+                "重新扫描游戏物品",
+                styles.ActionButton,
+                GUILayout.Height(36f)))
+        {
+            ItemSpawnRuntime
+                .Catalog
+                .ForceRefresh();
+
+            _manageScroll = Vector2.zero;
+            _addItemsScroll = Vector2.zero;
+
+            _managementStatus =
+                "已重新扫描游戏物品。";
+        }
+
+        if (GUILayout.Button(
+                "恢复默认物品和排序",
+                styles.ActionButton,
+                GUILayout.Height(36f)))
+        {
+            ItemSpawnRuntime
+                .Catalog
+                .RestoreDefaults();
+
+            _manageScroll = Vector2.zero;
+            _addItemsScroll = Vector2.zero;
+
+            _managementStatus =
+                "已恢复默认物品和默认排序。";
+        }
+
+        if (GUILayout.Button(
+                "返回物品列表",
+                styles.ActionButton,
+                GUILayout.Height(38f)))
+        {
+            _managementOpen = false;
+            _searchText = string.Empty;
+            _managementStatus = string.Empty;
+
+            _manageScroll = Vector2.zero;
+            _addItemsScroll = Vector2.zero;
         }
     }
 
-    GUILayout.EndScrollView();
+    private void DrawManagementLists(
+        Rect area,
+        MenuStyles styles)
+    {
+        float fixedHeight =
+            ManagementHeaderHeight * 2f +
+            ManagementSearchHeight +
+            ManagementSectionSpacing +
+            ManagementContentSpacing * 2f +
+            ManagementSearchSpacing;
 
-    GUILayout.Space(10f);
-
-    /*
-     * 添加物品区域。
-     */
-    GUILayout.Label(
-        "添加物品",
-        styles.Label
-    );
-
-    GUILayout.Space(4f);
-
-    _searchText =
-        GUILayout.TextField(
-            _searchText,
-            GUILayout.Height(32f),
-            GUILayout.ExpandWidth(true)
+        float listHeight = Mathf.Max(
+            1f,
+            (area.height - fixedHeight) * 0.5f
         );
 
-    GUILayout.Space(6f);
+        Rect visibleHeaderRect = new(
+            area.x,
+            area.y,
+            area.width,
+            ManagementHeaderHeight
+        );
 
-    /*
-     * 添加列表拥有独立的滚动区域。
-     */
-    _addItemsScroll =
-        GUILayout.BeginScrollView(
-            _addItemsScroll,
-            false,
-            true,
-            GUILayout.Height(
-                AddItemsListHeight
+        Rect visibleListRect = new(
+            area.x,
+            visibleHeaderRect.yMax +
+            ManagementContentSpacing,
+            area.width,
+            listHeight
+        );
+
+        Rect addHeaderRect = new(
+            area.x,
+            visibleListRect.yMax +
+            ManagementSectionSpacing,
+            area.width,
+            ManagementHeaderHeight
+        );
+
+        Rect searchRect = new(
+            area.x,
+            addHeaderRect.yMax +
+            ManagementContentSpacing,
+            area.width,
+            ManagementSearchHeight
+        );
+
+        Rect addListRect = new(
+            area.x,
+            searchRect.yMax +
+            ManagementSearchSpacing,
+            area.width,
+            listHeight
+        );
+
+        GUI.Label(
+            visibleHeaderRect,
+            "已显示物品",
+            styles.Label
+        );
+
+        DrawVisibleItemsList(
+            visibleListRect,
+            styles
+        );
+
+        GUI.Label(
+            addHeaderRect,
+            "添加物品",
+            styles.Label
+        );
+
+        _searchText = GUI.TextField(
+            searchRect,
+            _searchText
+        );
+
+        DrawAddItemsList(
+            addListRect,
+            styles
+        );
+    }
+
+    private void DrawVisibleItemsList(
+        Rect area,
+        MenuStyles styles)
+    {
+        ItemSpawnEntry[] visible =
+            ItemSpawnRuntime
+                .Catalog
+                .GetVisibleItems()
+                .ToArray();
+
+        float contentWidth = Mathf.Max(
+            1f,
+            area.width - ManagementScrollbarWidth
+        );
+
+        float contentHeight = Mathf.Max(
+            area.height,
+            visible.Length * ManagedItemRowHeight
+        );
+
+        _manageScroll = GUI.BeginScrollView(
+            area,
+            _manageScroll,
+            new Rect(
+                0f,
+                0f,
+                contentWidth,
+                contentHeight
             ),
-            GUILayout.ExpandWidth(true)
+            false,
+            true
         );
 
-    DrawSearchResults(styles);
+        if (visible.Length == 0)
+        {
+            GUI.Label(
+                new Rect(
+                    0f,
+                    0f,
+                    contentWidth,
+                    ManagedItemRowHeight
+                ),
+                "当前没有显示任何物品。",
+                styles.MutedLabel
+            );
+        }
+        else
+        {
+            for (int index = 0;
+                 index < visible.Length;
+                 index++)
+            {
+                DrawManagedItemRow(
+                    new Rect(
+                        0f,
+                        index * ManagedItemRowHeight,
+                        contentWidth,
+                        ManagedItemRowHeight
+                    ),
+                    visible[index],
+                    styles
+                );
+            }
+        }
 
-    GUILayout.EndScrollView();
+        GUI.EndScrollView();
+    }
 
-    GUILayout.Space(6f);
-
-    if (!string.IsNullOrWhiteSpace(
-            _managementStatus))
+    private void DrawAddItemsList(
+        Rect area,
+        MenuStyles styles)
     {
-        GUILayout.Label(
-            _managementStatus,
-            styles.MutedLabel
+        ItemSpawnEntry[] results =
+            GetSearchResults();
+
+        float contentWidth = Mathf.Max(
+            1f,
+            area.width - ManagementScrollbarWidth
         );
 
-        GUILayout.Space(4f);
+        float contentHeight = Mathf.Max(
+            area.height,
+            results.Length > 0
+                ? results.Length * AddItemRowHeight
+                : AddItemRowHeight
+        );
+
+        _addItemsScroll = GUI.BeginScrollView(
+            area,
+            _addItemsScroll,
+            new Rect(
+                0f,
+                0f,
+                contentWidth,
+                contentHeight
+            ),
+            false,
+            true
+        );
+
+        if (results.Length == 0)
+        {
+            string query =
+                _searchText.Trim();
+
+            GUI.Label(
+                new Rect(
+                    0f,
+                    0f,
+                    contentWidth,
+                    AddItemRowHeight
+                ),
+                string.IsNullOrWhiteSpace(query)
+                    ? "所有已发现物品都已添加，" +
+                      "或当前没有可添加物品。"
+                    : "没有找到匹配的物品。",
+                styles.MutedLabel
+            );
+        }
+        else
+        {
+            for (int index = 0;
+                 index < results.Length;
+                 index++)
+            {
+                DrawAddItemRow(
+                    new Rect(
+                        0f,
+                        index * AddItemRowHeight,
+                        contentWidth,
+                        AddItemRowHeight
+                    ),
+                    results[index],
+                    styles
+                );
+            }
+        }
+
+        GUI.EndScrollView();
     }
-
-    /*
-     * 底部操作按钮不放入滚动区域，
-     * 始终保持可见。
-     */
-    if (GUILayout.Button(
-            "重新扫描游戏物品",
-            styles.ActionButton,
-            GUILayout.Height(36f)))
-    {
-        ItemSpawnRuntime
-            .Catalog
-            .ForceRefresh();
-
-        _manageScroll = Vector2.zero;
-        _addItemsScroll = Vector2.zero;
-
-        _managementStatus =
-            "已重新扫描游戏物品。";
-    }
-
-    if (GUILayout.Button(
-            "恢复默认物品和排序",
-            styles.ActionButton,
-            GUILayout.Height(36f)))
-    {
-        ItemSpawnRuntime
-            .Catalog
-            .RestoreDefaults();
-
-        _manageScroll = Vector2.zero;
-        _addItemsScroll = Vector2.zero;
-
-        _managementStatus =
-            "已恢复默认物品和默认排序。";
-    }
-
-    if (GUILayout.Button(
-            "返回物品列表",
-            styles.ActionButton,
-            GUILayout.Height(38f)))
-    {
-        _managementOpen = false;
-        _searchText = string.Empty;
-        _managementStatus = string.Empty;
-
-        _manageScroll = Vector2.zero;
-        _addItemsScroll = Vector2.zero;
-    }
-}
 
     private static void DrawManagedItemRow(
+        Rect row,
         ItemSpawnEntry entry,
         MenuStyles styles)
     {
-        GUILayout.BeginHorizontal();
-
-        Rect iconRect =
-            GUILayoutUtility.GetRect(
-                30f,
-                34f,
-                GUILayout.Width(30f),
-                GUILayout.Height(34f)
-            );
-
         Rect fittedIconRect = new(
-            iconRect.x + 2f,
-            iconRect.y + 4f,
+            row.x + 2f,
+            row.y + 4f,
             26f,
             26f
         );
@@ -462,18 +618,45 @@ internal sealed class ItemSpawnerPage :
             styles
         );
 
-        GUILayout.Label(
-            entry.DisplayName,
-            styles.Label,
-            GUILayout.ExpandWidth(true),
-            GUILayout.Height(34f)
+        Rect deleteRect = new(
+            row.xMax - 58f,
+            row.y,
+            58f,
+            ManagedItemRowHeight
         );
 
-        if (GUILayout.Button(
+        Rect downRect = new(
+            deleteRect.x - 38f,
+            row.y,
+            38f,
+            ManagedItemRowHeight
+        );
+
+        Rect upRect = new(
+            downRect.x - 38f,
+            row.y,
+            38f,
+            ManagedItemRowHeight
+        );
+
+        GUI.Label(
+            new Rect(
+                row.x + 30f,
+                row.y,
+                Mathf.Max(
+                    0f,
+                    upRect.x - row.x - 34f
+                ),
+                ManagedItemRowHeight
+            ),
+            entry.DisplayName,
+            styles.Label
+        );
+
+        if (GUI.Button(
+                upRect,
                 "↑",
-                styles.ActionButton,
-                GUILayout.Width(38f),
-                GUILayout.Height(34f)))
+                styles.ActionButton))
         {
             ItemSpawnRuntime
                 .Catalog
@@ -483,11 +666,10 @@ internal sealed class ItemSpawnerPage :
                 );
         }
 
-        if (GUILayout.Button(
+        if (GUI.Button(
+                downRect,
                 "↓",
-                styles.ActionButton,
-                GUILayout.Width(38f),
-                GUILayout.Height(34f)))
+                styles.ActionButton))
         {
             ItemSpawnRuntime
                 .Catalog
@@ -497,11 +679,10 @@ internal sealed class ItemSpawnerPage :
                 );
         }
 
-        if (GUILayout.Button(
+        if (GUI.Button(
+                deleteRect,
                 "删除",
-                styles.ActionButton,
-                GUILayout.Width(58f),
-                GUILayout.Height(34f)))
+                styles.ActionButton))
         {
             ItemSpawnRuntime
                 .Catalog
@@ -510,11 +691,9 @@ internal sealed class ItemSpawnerPage :
                 );
         }
 
-        GUILayout.EndHorizontal();
     }
 
-    private void DrawSearchResults(
-        MenuStyles styles)
+    private ItemSpawnEntry[] GetSearchResults()
     {
         string query =
             _searchText.Trim();
@@ -537,56 +716,19 @@ internal sealed class ItemSpawnerPage :
                             entry,
                             query
                         )
-                )
-                .Take(
-                    MaximumSearchResults
                 );
 
-        ItemSpawnEntry[] results =
-            candidates.ToArray();
-
-        if (results.Length == 0)
-        {
-            GUILayout.Label(
-                string.IsNullOrWhiteSpace(query)
-                    ? "所有已发现物品都已添加，" +
-                      "或当前没有可添加物品。"
-                    : "没有找到匹配的物品。",
-                styles.MutedLabel
-            );
-
-            return;
-        }
-
-        foreach (ItemSpawnEntry entry
-                 in results)
-        {
-            DrawAddItemRow(
-                entry,
-                styles
-            );
-        }
+        return candidates.ToArray();
     }
 
     private void DrawAddItemRow(
+        Rect row,
         ItemSpawnEntry entry,
         MenuStyles styles)
     {
-        GUILayout.BeginHorizontal(
-            GUILayout.Height(42f)
-        );
-
-        Rect iconArea =
-            GUILayoutUtility.GetRect(
-                32f,
-                42f,
-                GUILayout.Width(32f),
-                GUILayout.Height(42f)
-            );
-
         Rect iconRect = new(
-            iconArea.x + 2f,
-            iconArea.y + 7f,
+            row.x + 2f,
+            row.y + 7f,
             28f,
             28f
         );
@@ -597,20 +739,31 @@ internal sealed class ItemSpawnerPage :
             styles
         );
 
-        GUILayout.Space(6f);
-
-        GUILayout.Label(
-            entry.DisplayName,
-            styles.Label,
-            GUILayout.ExpandWidth(true),
-            GUILayout.Height(42f)
+        Rect buttonRect = new(
+            row.xMax - 64f,
+            row.y + 4f,
+            64f,
+            34f
         );
 
-        if (GUILayout.Button(
+        GUI.Label(
+            new Rect(
+                row.x + 38f,
+                row.y,
+                Mathf.Max(
+                    0f,
+                    buttonRect.x - row.x - 44f
+                ),
+                AddItemRowHeight
+            ),
+            entry.DisplayName,
+            styles.Label
+        );
+
+        if (GUI.Button(
+                buttonRect,
                 "添加",
-                styles.ActionButton,
-                GUILayout.Width(64f),
-                GUILayout.Height(34f)))
+                styles.ActionButton))
         {
             ItemSpawnRuntime
                 .Catalog
@@ -632,7 +785,6 @@ internal sealed class ItemSpawnerPage :
                 );
         }
 
-        GUILayout.EndHorizontal();
     }
 
     private static bool MatchesSearch(

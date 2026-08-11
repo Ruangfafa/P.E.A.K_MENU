@@ -192,7 +192,7 @@ internal sealed class StatusService :
         {
             LastSucceeded = false;
             LastStatus =
-                "飞行总开关开启期间，无敌已被锁定。";
+                "实际飞行期间，无敌已被锁定。";
 
             return;
         }
@@ -275,7 +275,7 @@ internal sealed class StatusService :
         {
             LastSucceeded = false;
             LastStatus =
-                "飞行总开关开启期间，防击退已被锁定。";
+                "实际飞行期间，防击退已被锁定。";
 
             return;
         }
@@ -304,7 +304,7 @@ internal sealed class StatusService :
         {
             LastSucceeded = true;
             LastStatus =
-                "飞行功能已锁定无敌与防击退。";
+                "实际飞行已锁定无敌与防击退。";
         }
         else
         {
