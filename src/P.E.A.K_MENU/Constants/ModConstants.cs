@@ -12,9 +12,6 @@ internal static class ModConstants
     internal const float MinimumWindowWidth = 520f;
     internal const float MinimumWindowHeight = 360f;
 
-    internal const float MaximumWindowWidth = 1100f;
-    internal const float MaximumWindowHeight = 850f;
-
     internal const float WindowMargin = 20f;
     internal const float WindowTop = 80f;
 
