@@ -39,9 +39,6 @@ internal sealed class ItemSpawnerPage :
     private const float ManagementScrollbarWidth =
         20f;
 
-    private const int MaximumSearchResults =
-        100;
-
     private Vector2 _spawnScroll;
     private Vector2 _manageScroll;
     private Vector2 _addItemsScroll;
@@ -719,9 +716,6 @@ internal sealed class ItemSpawnerPage :
                             entry,
                             query
                         )
-                )
-                .Take(
-                    MaximumSearchResults
                 );
 
         return candidates.ToArray();
