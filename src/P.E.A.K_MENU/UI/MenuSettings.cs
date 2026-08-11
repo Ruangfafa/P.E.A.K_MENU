@@ -16,19 +16,17 @@ internal static class MenuSettings
         ModConstants.DefaultToggleMenuKey;
 
     internal static float WindowWidth =>
-        Mathf.Clamp(
+        Mathf.Max(
             _windowWidth?.Value ??
             ModConstants.DefaultWindowWidth,
-            ModConstants.MinimumWindowWidth,
-            ModConstants.MaximumWindowWidth
+            ModConstants.MinimumWindowWidth
         );
 
     internal static float WindowHeight =>
-        Mathf.Clamp(
+        Mathf.Max(
             _windowHeight?.Value ??
             ModConstants.DefaultWindowHeight,
-            ModConstants.MinimumWindowHeight,
-            ModConstants.MaximumWindowHeight
+            ModConstants.MinimumWindowHeight
         );
 
     internal static MenuTheme Theme =>
@@ -86,16 +84,14 @@ internal static class MenuSettings
         float width,
         float height)
     {
-        float clampedWidth = Mathf.Clamp(
+        float clampedWidth = Mathf.Max(
             width,
-            ModConstants.MinimumWindowWidth,
-            ModConstants.MaximumWindowWidth
+            ModConstants.MinimumWindowWidth
         );
 
-        float clampedHeight = Mathf.Clamp(
+        float clampedHeight = Mathf.Max(
             height,
-            ModConstants.MinimumWindowHeight,
-            ModConstants.MaximumWindowHeight
+            ModConstants.MinimumWindowHeight
         );
 
         if (_windowWidth is not null)

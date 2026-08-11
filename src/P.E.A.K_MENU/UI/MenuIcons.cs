@@ -25,9 +25,6 @@ internal static class MenuIcons
     internal static Texture2D? Status =>
         Get("status");
     
-    internal static Texture2D? BlowDart =>
-        Get("blowdart");
-
     internal static void Initialize()
     {
         Dispose();
@@ -71,12 +68,6 @@ internal static class MenuIcons
             "status.png"
         );
         
-        Load(
-            assembly,
-            "blowdart",
-            "blowdart.png"
-        );
-
         Plugin.Log.LogInfo(
             $"Loaded {Icons.Count} menu icons."
         );

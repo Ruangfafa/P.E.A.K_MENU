@@ -1,0 +1,3 @@
+dotnet build ".\src\P.E.A.K_MENU\P.E.A.K_MENU.csproj" -c Release
+dotnet build
+dotnet build -c Release -v d 

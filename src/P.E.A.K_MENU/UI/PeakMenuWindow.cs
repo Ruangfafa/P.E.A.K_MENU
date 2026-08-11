@@ -2,7 +2,6 @@
 using P.E.A.K_MENU.Constants;
 using P.E.A.K_MENU.UI.Pages;
 using P.E.A.K_MENU.Features.Teleport;
-using P.E.A.K_MENU.Features.BlowDart;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI;
@@ -80,10 +79,6 @@ internal sealed class PeakMenuWindow
                 {
                     MenuCategory.Status,
                     new StatusPage()
-                },
-                {
-                    MenuCategory.BlowDart,
-                    new BlowDartPage()
                 },
                 {
                     MenuCategory.Settings,
@@ -425,11 +420,6 @@ internal sealed class PeakMenuWindow
             "状态"
         );
         
-        DrawCategoryButton(
-            MenuCategory.BlowDart,
-            "吹箭"
-        );
-
         GUILayout.FlexibleSpace();
 
         DrawCategoryButton(
@@ -553,9 +543,6 @@ internal sealed class PeakMenuWindow
 
             MenuCategory.Status =>
                 MenuIcons.Status,
-
-            MenuCategory.BlowDart =>
-                MenuIcons.BlowDart,
 
             _ =>
                 null
@@ -861,15 +848,11 @@ internal sealed class PeakMenuWindow
         Vector2 delta =
             mousePosition - _resizeStartMouse;
 
-        float maximumWidth = Mathf.Min(
-            ModConstants.MaximumWindowWidth,
-            Screen.width - _windowRect.x
-        );
+        float maximumWidth =
+            Screen.width - _windowRect.x;
 
-        float maximumHeight = Mathf.Min(
-            ModConstants.MaximumWindowHeight,
-            Screen.height - _windowRect.y
-        );
+        float maximumHeight =
+            Screen.height - _windowRect.y;
 
         float minimumWidth = Mathf.Min(
             ModConstants.MinimumWindowWidth,
@@ -976,10 +959,7 @@ internal sealed class PeakMenuWindow
                 Screen.width
             ),
 
-            Mathf.Min(
-                ModConstants.MaximumWindowWidth,
-                Screen.width
-            )
+            Screen.width
         );
 
         float height = Mathf.Clamp(
@@ -990,10 +970,7 @@ internal sealed class PeakMenuWindow
                 Screen.height
             ),
 
-            Mathf.Min(
-                ModConstants.MaximumWindowHeight,
-                Screen.height
-            )
+            Screen.height
         );
 
         float x =
@@ -1021,15 +998,11 @@ internal sealed class PeakMenuWindow
             return;
         }
 
-        float maximumWidth = Mathf.Min(
-            ModConstants.MaximumWindowWidth,
-            Screen.width - _windowRect.x
-        );
+        float maximumWidth =
+            Screen.width - _windowRect.x;
 
-        float maximumHeight = Mathf.Min(
-            ModConstants.MaximumWindowHeight,
-            Screen.height - _windowRect.y
-        );
+        float maximumHeight =
+            Screen.height - _windowRect.y;
 
         float minimumWidth = Mathf.Min(
             ModConstants.MinimumWindowWidth,
@@ -1058,15 +1031,9 @@ internal sealed class PeakMenuWindow
 
     private void ClampToScreen()
     {
-        float maximumWidth = Mathf.Min(
-            ModConstants.MaximumWindowWidth,
-            Screen.width
-        );
+        float maximumWidth = Screen.width;
 
-        float maximumHeight = Mathf.Min(
-            ModConstants.MaximumWindowHeight,
-            Screen.height
-        );
+        float maximumHeight = Screen.height;
 
         float minimumWidth = Mathf.Min(
             ModConstants.MinimumWindowWidth,
