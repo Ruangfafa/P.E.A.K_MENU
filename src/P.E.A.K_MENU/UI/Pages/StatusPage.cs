@@ -90,7 +90,7 @@ internal sealed class StatusPage :
         GUILayout.Space(4f);
 
         /*
-         * 飞行总开关开启期间，
+         * 实际飞行期间，
          * 无敌状态由飞行功能管理。
          */
         GUI.enabled =
@@ -147,7 +147,7 @@ internal sealed class StatusPage :
         if (service.FlightProtectionLock)
         {
             GUILayout.Label(
-                "飞行总开关开启期间，角色保护状态由飞行功能管理。",
+                "实际飞行期间，角色保护状态由飞行功能管理。",
                 styles.MutedLabel
             );
 

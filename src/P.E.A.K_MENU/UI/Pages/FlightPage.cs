@@ -30,14 +30,14 @@ internal sealed class FlightPage :
             FlightRuntime.Service;
 
         GUILayout.Label(
-            "开启飞行总开关后，将强制开启无敌，并暂时关闭防击退。",
+            "飞行总开关仅启用快捷键；进入实际飞行后才会开启无敌。",
             styles.MutedLabel
         );
 
         GUILayout.Space(6f);
 
         GUILayout.Label(
-            "双击空格、滚轮调速和退出缓降均为固定功能。",
+            "退出实际飞行时会恢复此前的无敌与防击退状态。",
             styles.MutedLabel
         );
 
@@ -149,7 +149,7 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "退出实际飞行后：前 1 秒无重力，总计 5 秒缓降。",
+            "退出实际飞行后：保留正常重力，并限制 2 秒最大下落速度。",
             styles.MutedLabel
         );
 
