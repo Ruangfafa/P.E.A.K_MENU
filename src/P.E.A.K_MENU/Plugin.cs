@@ -11,6 +11,7 @@ using P.E.A.K_MENU.UI;
 namespace P.E.A.K_MENU;
 
 [BepInAutoPlugin]
+[UnityEngine.DefaultExecutionOrder(10000)]
 public partial class Plugin :
     BaseUnityPlugin
 {
@@ -108,6 +109,11 @@ public partial class Plugin :
     private void OnGUI()
     {
         _menuWindow.Draw();
+    }
+
+    private void LateUpdate()
+    {
+        _menuWindow.LateUpdate();
     }
 
     private void OnDisable()

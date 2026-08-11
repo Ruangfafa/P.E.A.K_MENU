@@ -155,9 +155,18 @@ internal sealed class PeakMenuWindow
             return;
         }
 
-        _cursorController.MaintainReleased();
-
         RecoverLostPointerRelease();
+    }
+
+    internal void LateUpdate()
+    {
+        if (_disposed ||
+            (!_isOpen && !_closeAfterMouseRelease))
+        {
+            return;
+        }
+
+        _cursorController.MaintainReleased();
     }
 
     internal void Draw()
@@ -166,8 +175,6 @@ internal sealed class PeakMenuWindow
         {
             return;
         }
-
-        _cursorController.MaintainReleased();
 
         InitializePosition();
         EnsureCurrentTheme();
