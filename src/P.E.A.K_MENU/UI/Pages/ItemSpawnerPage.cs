@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using P.E.A.K_MENU.Features.ItemSpawn;
+using P.E.A.K_MENU.Input;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI.Pages;
@@ -53,6 +54,9 @@ internal sealed class ItemSpawnerPage :
 
     private string _searchText =
         string.Empty;
+
+    private readonly ShortcutRebindControl
+        _shortcutRebind = new();
 
     public string Title =>
         _managementOpen
@@ -114,6 +118,8 @@ internal sealed class ItemSpawnerPage :
                 styles.MutedLabel
             );
         }
+
+        _shortcutRebind.CaptureEvent();
     }
 
     private void DrawSpawnList(
@@ -123,6 +129,24 @@ internal sealed class ItemSpawnerPage :
             "点击物品后，将通过 PEAK 原生网络流程生成并交给本地玩家。",
             styles.MutedLabel
         );
+
+        GUILayout.Space(8f);
+
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label(
+            "生成上一个物品",
+            styles.Label,
+            GUILayout.Height(38f),
+            GUILayout.ExpandWidth(true)
+        );
+
+        _shortcutRebind.DrawButtons(
+            FeatureShortcutAction.SpawnLastItem,
+            styles
+        );
+
+        GUILayout.EndHorizontal();
 
         GUILayout.Space(8f);
 

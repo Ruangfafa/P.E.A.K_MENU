@@ -7,6 +7,8 @@ namespace P.E.A.K_MENU.Features.ItemSpawn;
 /// </summary>
 internal sealed class ItemSpawnService
 {
+    private ItemSpawnEntry? _lastSpawnedItem;
+
     internal string LastStatus
     {
         get;
@@ -79,6 +81,8 @@ internal sealed class ItemSpawnService
 
             LastSucceeded = true;
 
+            _lastSpawnedItem = entry;
+
             LastStatus =
                 $"已生成：{entry.DisplayName}";
 
@@ -101,6 +105,18 @@ internal sealed class ItemSpawnService
                 $"{exception}"
             );
         }
+    }
+
+    internal void SpawnLast()
+    {
+        if (_lastSpawnedItem is null)
+        {
+            LastSucceeded = false;
+            LastStatus = "尚未生成过物品。";
+            return;
+        }
+
+        Spawn(_lastSpawnedItem);
     }
 
     internal void ClearStatus()

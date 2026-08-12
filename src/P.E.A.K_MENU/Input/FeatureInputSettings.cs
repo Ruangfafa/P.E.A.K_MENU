@@ -99,6 +99,13 @@ internal static class FeatureInputSettings
             "ToggleWeightOverride",
             FeatureInputBinding.NoneValue
         );
+
+        Bind(
+            config,
+            FeatureShortcutAction.SpawnLastItem,
+            "SpawnLastItem",
+            FeatureInputBinding.NoneValue
+        );
     }
 
     internal static FeatureInputBinding GetBinding(

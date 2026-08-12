@@ -10,5 +10,6 @@ internal enum FeatureShortcutAction
     ToggleAntiKnockback,
     ToggleInfiniteStamina,
     ReviveSelf,
-    ToggleWeightOverride
+    ToggleWeightOverride,
+    SpawnLastItem
 }

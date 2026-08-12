@@ -1,4 +1,5 @@
 using P.E.A.K_MENU.Features.Flight;
+using P.E.A.K_MENU.Features.ItemSpawn;
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.UI;
 
@@ -16,6 +17,7 @@ internal sealed class FeatureShortcutController
 
         UpdateFlightShortcuts();
         UpdateStatusShortcuts();
+        UpdateItemSpawnShortcuts();
     }
 
     private static void UpdateFlightShortcuts()
@@ -110,6 +112,20 @@ internal sealed class FeatureShortcutController
             service.SetWeightOverride(
                 !service.WeightOverrideEnabled
             );
+        }
+    }
+
+    private static void UpdateItemSpawnShortcuts()
+    {
+        if (!ItemSpawnRuntime.IsInitialized)
+        {
+            return;
+        }
+
+        if (FeatureInputSettings.IsPressed(
+                FeatureShortcutAction.SpawnLastItem))
+        {
+            ItemSpawnRuntime.Spawner.SpawnLast();
         }
     }
 }
