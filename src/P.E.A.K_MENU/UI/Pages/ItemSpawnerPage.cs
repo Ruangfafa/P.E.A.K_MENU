@@ -15,6 +15,9 @@ internal sealed class ItemSpawnerPage :
     private const float IconSize =
         40f;
 
+    private const float SpawnColumnSpacing =
+        6f;
+
     private const float ManagementHeaderHeight =
         22f;
 
@@ -123,6 +126,55 @@ internal sealed class ItemSpawnerPage :
 
         GUILayout.Space(8f);
 
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+
+        int spawnColumns =
+            ItemSpawnConfiguration
+                .SpawnColumns;
+
+        Rect columnButtonRect =
+            GUILayoutUtility.GetRect(
+                128f,
+                32f,
+                GUILayout.Width(128f),
+                GUILayout.Height(32f)
+            );
+
+        Event currentEvent =
+            Event.current;
+
+        if (currentEvent.type ==
+                EventType.MouseDown &&
+            columnButtonRect.Contains(
+                currentEvent.mousePosition
+            ) &&
+            (currentEvent.button == 0 ||
+             currentEvent.button == 1))
+        {
+            int nextColumns =
+                currentEvent.button == 0
+                    ? spawnColumns % 9 + 1
+                    : (spawnColumns + 7) % 9 + 1;
+
+            ItemSpawnConfiguration
+                .SetSpawnColumns(
+                    nextColumns
+                );
+
+            currentEvent.Use();
+        }
+
+        GUI.Button(
+            columnButtonRect,
+            $"列数：{spawnColumns}  左+ / 右-",
+            styles.ActionButton
+        );
+
+        GUILayout.EndHorizontal();
+
+        GUILayout.Space(6f);
+
         IReadOnlyList<ItemSpawnEntry>
             entries =
                 ItemSpawnRuntime
@@ -152,14 +204,10 @@ internal sealed class ItemSpawnerPage :
         }
         else
         {
-            foreach (ItemSpawnEntry entry
-                     in entries)
-            {
-                DrawSpawnButton(
-                    entry,
-                    styles
-                );
-            }
+            DrawSpawnGrid(
+                entries,
+                styles
+            );
         }
 
         GUILayout.EndScrollView();
@@ -194,17 +242,69 @@ internal sealed class ItemSpawnerPage :
         }
     }
 
+    private static void DrawSpawnGrid(
+        IReadOnlyList<ItemSpawnEntry> entries,
+        MenuStyles styles)
+    {
+        int columns =
+            ItemSpawnConfiguration
+                .SpawnColumns;
+
+        for (int rowStart = 0;
+             rowStart < entries.Count;
+             rowStart += columns)
+        {
+            Rect gridRow =
+                GUILayoutUtility.GetRect(
+                    1f,
+                    ItemRowHeight,
+                    GUILayout.ExpandWidth(true)
+                );
+
+            float itemWidth = Mathf.Max(
+                1f,
+                (gridRow.width -
+                 SpawnColumnSpacing *
+                 (columns - 1)) /
+                columns
+            );
+
+            for (int column = 0;
+                 column < columns;
+                 column++)
+            {
+                int index =
+                    rowStart + column;
+
+                if (index >= entries.Count)
+                {
+                    break;
+                }
+
+                Rect itemRect = new(
+                    gridRow.x +
+                    column *
+                    (itemWidth +
+                     SpawnColumnSpacing),
+                    gridRow.y,
+                    itemWidth,
+                    gridRow.height
+                );
+
+                DrawSpawnButton(
+                    itemRect,
+                    entries[index],
+                    styles
+                );
+            }
+        }
+    }
+
     private static void DrawSpawnButton(
+        Rect row,
         ItemSpawnEntry entry,
         MenuStyles styles)
     {
-        Rect row =
-            GUILayoutUtility.GetRect(
-                1f,
-                ItemRowHeight,
-                GUILayout.ExpandWidth(true)
-            );
-
         if (GUI.Button(
                 row,
                 GUIContent.none,

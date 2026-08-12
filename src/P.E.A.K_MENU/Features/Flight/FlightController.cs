@@ -28,7 +28,7 @@ internal sealed class FlightController :
      * 自动下降时可降低到 60～80。
      */
     private const float HoverDownForce =
-        223f;
+        225f;
 
     /*
      * 防止异常输入或速度设置产生过大的作用力。

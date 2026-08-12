@@ -22,8 +22,15 @@ internal sealed class CursorController
 
     internal void MaintainReleased()
     {
-        Cursor.visible = true;
-        Cursor.lockState = CursorLockMode.None;
+        if (Cursor.lockState != CursorLockMode.None)
+        {
+            Cursor.lockState = CursorLockMode.None;
+        }
+
+        if (!Cursor.visible)
+        {
+            Cursor.visible = true;
+        }
     }
 
     internal void Restore()
@@ -33,8 +40,16 @@ internal sealed class CursorController
             return;
         }
 
-        Cursor.visible = _previousVisible;
-        Cursor.lockState = _previousLockMode;
+        if (Cursor.lockState != _previousLockMode)
+        {
+            Cursor.lockState = _previousLockMode;
+        }
+
+        if (Cursor.visible != _previousVisible)
+        {
+            Cursor.visible = _previousVisible;
+        }
+
         _stateSaved = false;
     }
 }

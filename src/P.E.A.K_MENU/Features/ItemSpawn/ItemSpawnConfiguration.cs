@@ -11,6 +11,16 @@ namespace P.E.A.K_MENU.Features.ItemSpawn;
 internal static class ItemSpawnConfiguration
 {
     private static ConfigEntry<string>? _visibleItems;
+    private static ConfigEntry<int>? _spawnColumns;
+
+    internal static int SpawnColumns =>
+        Math.Max(
+            1,
+            Math.Min(
+                9,
+                _spawnColumns?.Value ?? 4
+            )
+        );
 
     internal static void Initialize(
         ConfigFile config)
@@ -22,6 +32,36 @@ internal static class ItemSpawnConfiguration
             "物品生成页面显示的物品 prefab 名称。" +
             "多个名称使用 | 分隔，保存顺序即菜单显示顺序。" +
             "留空时使用默认物品和默认排序。"
+        );
+
+        _spawnColumns = config.Bind(
+            "ItemSpawn",
+            "SpawnColumns",
+            4,
+            new ConfigDescription(
+                "物品生成主列表的显示列数。",
+                new AcceptableValueRange<int>(
+                    1,
+                    9
+                )
+            )
+        );
+    }
+
+    internal static void SetSpawnColumns(
+        int columns)
+    {
+        if (_spawnColumns is null)
+        {
+            return;
+        }
+
+        _spawnColumns.Value = Math.Max(
+            1,
+            Math.Min(
+                9,
+                columns
+            )
         );
     }
 
