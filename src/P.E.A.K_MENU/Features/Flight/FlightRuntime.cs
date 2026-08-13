@@ -1,3 +1,5 @@
+using BepInEx.Configuration;
+
 namespace P.E.A.K_MENU.Features.Flight;
 
 internal static class FlightRuntime
@@ -23,7 +25,8 @@ internal static class FlightRuntime
         }
     }
 
-    internal static void Initialize()
+    internal static void Initialize(
+        ConfigFile config)
     {
         if (_service is not null)
         {
@@ -31,7 +34,9 @@ internal static class FlightRuntime
         }
 
         _service =
-            new FlightService();
+            new FlightService(
+                config
+            );
 
         Plugin.Log.LogInfo(
             "Flight runtime initialized."

@@ -69,7 +69,9 @@ public partial class Plugin :
 
         InitializeFeature(
             "Flight",
-            FlightRuntime.Initialize
+            () => FlightRuntime.Initialize(
+                Config
+            )
         );
 
         _menuWindow =
