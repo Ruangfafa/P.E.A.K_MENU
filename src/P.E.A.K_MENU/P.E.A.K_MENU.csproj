@@ -6,7 +6,7 @@
     <AssemblyName>ruangfafa.peakmenu</AssemblyName>
     <AssemblyTitle>P.E.A.K_MENU</AssemblyTitle>
 
-    <Version>0.3.2</Version>
+    <Version>0.3.3</Version>
 
     <Description>PEAK 游戏内实用菜单，包含物品生成、玩家传送、飞行、状态控制、主题与可调整界面。</Description>
   </PropertyGroup>

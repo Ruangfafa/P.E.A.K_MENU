@@ -40,14 +40,14 @@ internal sealed class TeleportPage :
         if (!service.HasOtherPlayers)
         {
             GUILayout.Label(
-                "当前没有自己以外的玩家。",
+                "当前没有其他玩家。",
                 styles.MutedLabel
             );
 
             GUILayout.Space(8f);
 
             GUILayout.Label(
-                "传送菜单暂不可用。",
+                "请等待其他玩家加入，页面会自动刷新。",
                 styles.MutedLabel
             );
 
@@ -172,7 +172,7 @@ internal sealed class TeleportPage :
         {
             /*
              * TeleportLocalTo 内部会先刷新，
-             * 再根据 ActorNumber 获取最新对象。
+             * 再根据 ViewID 与 ActorNumber 获取最新玩家对象。
              */
             service.TeleportLocalTo(
                 player
@@ -189,7 +189,7 @@ internal sealed class TeleportPage :
         {
             /*
              * BringPlayerToLocal 内部会先刷新，
-             * 再根据 ActorNumber 获取最新对象。
+             * 再根据 ViewID 与 ActorNumber 获取最新玩家对象。
              */
             service.BringPlayerToLocal(
                 player

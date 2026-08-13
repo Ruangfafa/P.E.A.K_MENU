@@ -21,16 +21,6 @@ internal sealed class FlightController :
         4f;
 
     /*
-     * 抵消持续设置 isGrounded 后，
-     * PEAK 主动布娃娃产生的向上支撑力。
-     *
-     * 仍然自动上升时可提高到 120～160；
-     * 自动下降时可降低到 60～80。
-     */
-    private const float HoverDownForce =
-        225f;
-
-    /*
      * 防止异常输入或速度设置产生过大的作用力。
      */
     private const float MaximumForce =
@@ -114,6 +104,11 @@ internal sealed class FlightController :
                 .Service
                 .FlightSpeed;
 
+        float hoverDownForce =
+            FlightRuntime
+                .Service
+                .HoverDownForce;
+
         float force =
             selectedSpeed *
             FlightForceMultiplier;
@@ -196,7 +191,7 @@ internal sealed class FlightController :
          * Shift 加速。
          *
          * 必须在加入悬停向下补偿之前处理，
-         * 否则 HoverDownForce 也会被放大四倍。
+         * 否则重力校准值也会被放大四倍。
          */
         if (UnityEngine.Input.GetKey(
                 KeyCode.LeftShift) ||
@@ -223,12 +218,12 @@ internal sealed class FlightController :
          *
          * 默认速度 16 时：
          * Space 向上力约为 800；
-         * 悬停向下补偿仅为 100；
+         * 默认悬停向下补偿为 380；
          * 因此按 Space 时仍有明显净向上力。
          */
         flyForce +=
             Vector3.down *
-            HoverDownForce;
+            hoverDownForce;
 
         flyForce =
             ClampForce(
@@ -256,7 +251,9 @@ internal sealed class FlightController :
 
         Vector3 hoverForce =
             Vector3.down *
-            HoverDownForce;
+            FlightRuntime
+                .Service
+                .HoverDownForce;
 
         ApplyForceToRagdoll(
             character,

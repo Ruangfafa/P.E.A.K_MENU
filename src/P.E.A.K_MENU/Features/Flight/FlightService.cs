@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BepInEx.Configuration;
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.Input;
 using P.E.A.K_MENU.UI;
@@ -22,10 +23,22 @@ internal sealed class FlightService :
         16f;
 
     private const float MinimumFlightSpeed =
-        0.5f;
+        16f;
 
     private const float MaximumFlightSpeed =
-        100f;
+        255f;
+
+    internal const float DefaultHoverDownForce =
+        380f;
+
+    private const float MinimumHoverDownForce =
+        0f;
+
+    private const float MaximumHoverDownForce =
+        500f;
+
+    private const float HoverDownForceStep =
+        1f;
 
     /*
      * 两次空格按下之间的最大间隔。
@@ -53,6 +66,9 @@ internal sealed class FlightService :
 
     private bool _enabled;
     private bool _activelyFlying;
+
+    private readonly ConfigEntry<float>
+        _hoverDownForce;
 
     private float _flightSpeed =
         DefaultFlightSpeed;
@@ -86,6 +102,31 @@ internal sealed class FlightService :
 
     internal float FlightSpeed =>
         _flightSpeed;
+
+    internal float HoverDownForce =>
+        Mathf.Clamp(
+            _hoverDownForce.Value,
+            MinimumHoverDownForce,
+            MaximumHoverDownForce
+        );
+
+    internal FlightService(
+        ConfigFile config)
+    {
+        _hoverDownForce = config.Bind(
+            "Flight",
+            "HoverDownForce",
+            DefaultHoverDownForce,
+            new ConfigDescription(
+                "实际飞行浮空时的向下重力补偿力。" +
+                "增加可抑制自动上浮，减少可缓解自动下沉。",
+                new AcceptableValueRange<float>(
+                    MinimumHoverDownForce,
+                    MaximumHoverDownForce
+                )
+            )
+        );
+    }
 
     internal string LastStatus
     {
@@ -252,6 +293,41 @@ internal sealed class FlightService :
             direction > 0f
                 ? $"提高飞行速度：{_flightSpeed:0.##}。"
                 : $"降低飞行速度：{_flightSpeed:0.##}。";
+    }
+
+    internal void AdjustHoverDownForce(
+        float direction)
+    {
+        if (!_enabled ||
+            !_activelyFlying ||
+            Mathf.Approximately(direction, 0f))
+        {
+            return;
+        }
+
+        _hoverDownForce.Value = Mathf.Clamp(
+            HoverDownForce +
+            Mathf.Sign(direction) *
+            HoverDownForceStep,
+            MinimumHoverDownForce,
+            MaximumHoverDownForce
+        );
+
+        LastSucceeded = true;
+        LastStatus =
+            $"浮空重力校准已调整为 " +
+            $"{HoverDownForce:0.##}。";
+    }
+
+    internal void ResetHoverDownForce()
+    {
+        _hoverDownForce.Value =
+            DefaultHoverDownForce;
+
+        LastSucceeded = true;
+        LastStatus =
+            $"浮空重力校准已恢复默认值 " +
+            $"{DefaultHoverDownForce:0.##}。";
     }
 
     internal void ToggleActiveFlight()

@@ -69,7 +69,17 @@ public partial class Plugin :
 
         InitializeFeature(
             "Flight",
-            FlightRuntime.Initialize
+            () => FlightRuntime.Initialize(
+                Config
+            )
+        );
+
+        InitializeFeature(
+            "Update defaults",
+            () => ModUpdateSettings.Apply(
+                Config,
+                Info.Metadata.Version.ToString()
+            )
         );
 
         _menuWindow =

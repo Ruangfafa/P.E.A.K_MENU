@@ -11,6 +11,8 @@ internal sealed class FlightPage :
     private string _speedInput =
         "16";
 
+    private bool _showGravityCalibration;
+
     private readonly ShortcutRebindControl
         _shortcutRebind = new();
 
@@ -138,7 +140,7 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "实际飞行时，每次提高或降低 5 点。",
+            "调整范围为 16–255；实际飞行时，每次提高或降低 5 点。",
             styles.MutedLabel
         );
 
@@ -154,6 +156,13 @@ internal sealed class FlightPage :
             service,
             styles,
             increase: false
+        );
+
+        GUILayout.Space(12f);
+
+        DrawGravityCalibration(
+            service,
+            styles
         );
 
         GUILayout.Space(12f);
@@ -264,6 +273,83 @@ internal sealed class FlightPage :
         );
 
         GUILayout.EndHorizontal();
+    }
+
+    private void DrawGravityCalibration(
+        FlightService service,
+        MenuStyles styles)
+    {
+        if (GUILayout.Button(
+                _showGravityCalibration
+                    ? "高级校准 ▾"
+                    : "高级校准 ▸",
+                styles.ActionButton,
+                GUILayout.Height(32f)))
+        {
+            _showGravityCalibration =
+                !_showGravityCalibration;
+        }
+
+        if (!_showGravityCalibration)
+        {
+            return;
+        }
+
+        GUILayout.Space(6f);
+
+        GUILayout.Label(
+            $"浮空重力校准：{service.HoverDownForce:0.##}",
+            styles.Label
+        );
+
+        GUILayout.Label(
+            "增加 = 加强向下补偿；角色仍在缓慢上浮时使用。",
+            styles.MutedLabel
+        );
+
+        GUILayout.Label(
+            "减少 = 减弱向下补偿；角色正在缓慢下沉时使用。",
+            styles.MutedLabel
+        );
+
+        GUILayout.Label(
+            "为避免误调，仅可在实际飞行状态下每次微调 1 点。",
+            styles.MutedLabel
+        );
+
+        GUILayout.Space(6f);
+        GUILayout.BeginHorizontal();
+
+        GUI.enabled =
+            service.Enabled &&
+            service.ActivelyFlying;
+
+        if (GUILayout.Button(
+                "减少 1",
+                styles.ActionButton,
+                GUILayout.Height(34f)))
+        {
+            service.AdjustHoverDownForce(-1f);
+        }
+
+        if (GUILayout.Button(
+                "增加 1",
+                styles.ActionButton,
+                GUILayout.Height(34f)))
+        {
+            service.AdjustHoverDownForce(1f);
+        }
+
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+
+        if (GUILayout.Button(
+                $"恢复默认（{FlightService.DefaultHoverDownForce:0.##}）",
+                styles.ActionButton,
+                GUILayout.Height(34f)))
+        {
+            service.ResetHoverDownForce();
+        }
     }
 
     private static string ResolveFlightStatus(
