@@ -36,7 +36,7 @@ internal sealed class FlightPage :
             FlightRuntime.Service;
 
         GUILayout.Label(
-            "飞行总开关仅启用快捷键；进入实际飞行后才会开启无敌。",
+            "飞行总开关仅启用快捷键；进入实际飞行后才会开启无敌与防击退。",
             styles.MutedLabel
         );
 
