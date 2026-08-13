@@ -74,6 +74,14 @@ public partial class Plugin :
             )
         );
 
+        InitializeFeature(
+            "Update defaults",
+            () => ModUpdateSettings.Apply(
+                Config,
+                Info.Metadata.Version.ToString()
+            )
+        );
+
         _menuWindow =
             new PeakMenuWindow();
 

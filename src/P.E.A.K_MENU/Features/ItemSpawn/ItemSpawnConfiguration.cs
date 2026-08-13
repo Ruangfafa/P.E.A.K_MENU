@@ -10,15 +10,22 @@ namespace P.E.A.K_MENU.Features.ItemSpawn;
 /// </summary>
 internal static class ItemSpawnConfiguration
 {
+    internal const int DefaultSpawnColumns =
+        4;
+
     private static ConfigEntry<string>? _visibleItems;
     private static ConfigEntry<int>? _spawnColumns;
+
+    internal static bool IsInitialized =>
+        _spawnColumns is not null;
 
     internal static int SpawnColumns =>
         Math.Max(
             1,
             Math.Min(
                 9,
-                _spawnColumns?.Value ?? 4
+                _spawnColumns?.Value ??
+                DefaultSpawnColumns
             )
         );
 
@@ -37,7 +44,7 @@ internal static class ItemSpawnConfiguration
         _spawnColumns = config.Bind(
             "ItemSpawn",
             "SpawnColumns",
-            4,
+            DefaultSpawnColumns,
             new ConfigDescription(
                 "物品生成主列表的显示列数。",
                 new AcceptableValueRange<int>(
@@ -62,6 +69,13 @@ internal static class ItemSpawnConfiguration
                 9,
                 columns
             )
+        );
+    }
+
+    internal static void ResetSpawnColumns()
+    {
+        SetSpawnColumns(
+            DefaultSpawnColumns
         );
     }
 
