@@ -614,11 +614,12 @@ internal sealed class FlightService :
         );
 
         /*
-         * 物理式飞行会对角色施加力，
-         * 因此实际飞行期间暂时关闭防击退。
+         * 飞行控制器直接向布娃娃刚体施加飞行力，
+         * 不经过防击退补丁拦截的 Character 外力方法，
+         * 因此可以在飞行期间同时保持防击退。
          */
         statusService.SetAntiKnockback(
-            false,
+            true,
             force: true
         );
 
@@ -964,13 +965,13 @@ internal sealed class FlightService :
         }
 
         /*
-         * 实际飞行期间保持防击退关闭，
-         * 避免防击退补丁移除飞行作用力。
+         * 飞行力直接施加到布娃娃刚体，
+         * 可以与 Character 外力层的防击退同时生效。
          */
-        if (service.AntiKnockback)
+        if (!service.AntiKnockback)
         {
             service.SetAntiKnockback(
-                false,
+                true,
                 force: true
             );
         }
