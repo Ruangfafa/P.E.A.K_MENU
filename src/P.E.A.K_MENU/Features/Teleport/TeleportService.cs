@@ -69,12 +69,14 @@ internal sealed class TeleportService
             Time.unscaledTime +
             AutomaticRefreshInterval;
 
-        Character? localCharacter =
-            Character.localCharacter;
-
         Character[] discoveredCharacters =
             Resources.FindObjectsOfTypeAll<
                 Character>();
+
+        Character? localCharacter =
+            ResolveCurrentLocalCharacter(
+                discoveredCharacters
+            );
 
         var discoveredPlayers =
             new List<TeleportPlayerEntry>();
@@ -82,14 +84,15 @@ internal sealed class TeleportService
         foreach (Character character
                  in discoveredCharacters)
         {
-            if (!IsUsableCharacter(
+            if (!IsUsablePlayerCharacter(
                     character))
             {
                 continue;
             }
 
-            if (localCharacter is not null &&
-                character == localCharacter)
+            if (IsLocalCharacter(
+                    character,
+                    localCharacter))
             {
                 continue;
             }
@@ -109,8 +112,8 @@ internal sealed class TeleportService
                 );
 
             /*
-             * ActorNumber 相同的角色只保留一个。
-             * 场景切换时可能会短暂残留旧 Character。
+             * IsRegisteredToPlayer 已确保这是该 Actor
+             * 当前登记的玩家角色。这里额外防止重复项。
              */
             if (discoveredPlayers.Any(
                     player =>
@@ -131,6 +134,7 @@ internal sealed class TeleportService
                 new TeleportPlayerEntry(
                     character,
                     actorNumber,
+                    photonView.ViewID,
                     displayName
                 )
             );
@@ -177,29 +181,10 @@ internal sealed class TeleportService
     }
 
     /// <summary>
-    /// 用于进入传送菜单前检查。
-    /// 每次都会立即刷新。
-    /// </summary>
-    internal bool CanOpenMenu()
-    {
-        bool available =
-            RefreshPlayers();
-
-        if (!available)
-        {
-            LastSucceeded = false;
-            LastStatus =
-                "当前没有其他玩家，无法进入传送菜单。";
-        }
-
-        return available;
-    }
-
-    /// <summary>
     /// 把本地玩家传送到目标玩家附近。
     ///
-    /// 执行前重新扫描，并根据 ActorNumber
-    /// 获取最新的 Character 对象。
+    /// 执行前重新扫描，并根据 ViewID 与 ActorNumber
+    /// 获取最新且已登记的玩家 Character 对象。
     /// </summary>
     internal void TeleportLocalTo(
         TeleportPlayerEntry selectedTarget)
@@ -207,7 +192,7 @@ internal sealed class TeleportService
         LastSucceeded = false;
 
         Character? localCharacter =
-            Character.localCharacter;
+            ResolveCurrentLocalCharacter();
 
         if (localCharacter is null)
         {
@@ -271,8 +256,8 @@ internal sealed class TeleportService
     /// <summary>
     /// 把目标玩家传送到本地玩家附近。
     ///
-    /// 执行前重新扫描，并根据 ActorNumber
-    /// 获取最新的 Character 对象。
+    /// 执行前重新扫描，并根据 ViewID 与 ActorNumber
+    /// 获取最新且已登记的玩家 Character 对象。
     /// </summary>
     internal void BringPlayerToLocal(
         TeleportPlayerEntry selectedTarget)
@@ -280,7 +265,7 @@ internal sealed class TeleportService
         LastSucceeded = false;
 
         Character? localCharacter =
-            Character.localCharacter;
+            ResolveCurrentLocalCharacter();
 
         if (localCharacter is null)
         {
@@ -355,7 +340,7 @@ internal sealed class TeleportService
 
     /// <summary>
     /// 操作前重新扫描玩家，
-    /// 并使用 ActorNumber 获取最新目标。
+    /// 并使用 ViewID 与 ActorNumber 获取最新玩家目标。
     /// </summary>
     private bool TryResolveFreshTarget(
         TeleportPlayerEntry selectedTarget,
@@ -375,6 +360,9 @@ internal sealed class TeleportService
         int actorNumber =
             selectedTarget.ActorNumber;
 
+        int viewId =
+            selectedTarget.ViewId;
+
         /*
          * 每次点击“去”或“来”之前强制刷新。
          */
@@ -388,6 +376,11 @@ internal sealed class TeleportService
         }
 
         freshTarget =
+            _players.FirstOrDefault(
+                player =>
+                    player.ViewId ==
+                    viewId
+            ) ??
             _players.FirstOrDefault(
                 player =>
                     player.ActorNumber ==
@@ -415,8 +408,20 @@ internal sealed class TeleportService
             return false;
         }
 
-        if (freshTarget.Character ==
-            Character.localCharacter)
+        if (!IsUsablePlayerCharacter(
+                freshTarget.Character))
+        {
+            LastSucceeded = false;
+            LastStatus =
+                "目标不是当前登记的玩家角色。";
+
+            freshTarget = null;
+            return false;
+        }
+
+        if (IsLocalCharacter(
+                freshTarget.Character,
+                ResolveCurrentLocalCharacter()))
         {
             LastSucceeded = false;
             LastStatus =
@@ -737,6 +742,94 @@ internal sealed class TeleportService
 
         return character.photonView
                is not null;
+    }
+
+    private static bool
+        IsUsablePlayerCharacter(
+            Character? character)
+    {
+        return IsUsableCharacter(
+                   character) &&
+               character!.IsPlayerControlled &&
+               character.IsRegisteredToPlayer;
+    }
+
+    private static Character?
+        ResolveCurrentLocalCharacter(
+            Character[]? discoveredCharacters = null)
+    {
+        Character[] characters =
+            discoveredCharacters ??
+            Resources.FindObjectsOfTypeAll<
+                Character>();
+
+        Character? detectedLocal =
+            characters.FirstOrDefault(character =>
+                IsUsablePlayerCharacter(
+                    character) &&
+                IsLocalCharacter(
+                    character,
+                    null
+                ));
+
+        if (detectedLocal is not null)
+        {
+            return detectedLocal;
+        }
+
+        Character? registeredLocal =
+            Character.localCharacter;
+
+        return IsUsablePlayerCharacter(
+                registeredLocal)
+            ? registeredLocal
+            : null;
+    }
+
+    private static bool IsLocalCharacter(
+        Character? character,
+        Character? knownLocalCharacter)
+    {
+        if (character is null)
+        {
+            return false;
+        }
+
+        if (knownLocalCharacter is not null &&
+            ReferenceEquals(
+                character,
+                knownLocalCharacter))
+        {
+            return true;
+        }
+
+        if (character.IsLocal)
+        {
+            return true;
+        }
+
+        PhotonView? photonView =
+            character.photonView;
+
+        if (photonView is null)
+        {
+            return false;
+        }
+
+        if (photonView.IsMine)
+        {
+            return true;
+        }
+
+        int localActorNumber =
+            PhotonNetwork.LocalPlayer?
+                .ActorNumber ??
+            0;
+
+        return localActorNumber != 0 &&
+               photonView.Owner is not null &&
+               photonView.Owner.ActorNumber ==
+               localActorNumber;
     }
 
     private static int ResolveActorNumber(

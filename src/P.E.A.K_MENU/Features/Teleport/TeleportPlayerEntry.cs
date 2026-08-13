@@ -8,10 +8,12 @@ internal sealed class TeleportPlayerEntry
     internal TeleportPlayerEntry(
         Character character,
         int actorNumber,
+        int viewId,
         string displayName)
     {
         Character = character;
         ActorNumber = actorNumber;
+        ViewId = viewId;
         DisplayName = displayName;
     }
 
@@ -27,6 +29,11 @@ internal sealed class TeleportPlayerEntry
     internal int ActorNumber { get; }
 
     /// <summary>
+    /// 当前玩家角色自身的 Photon ViewID。
+    /// </summary>
+    internal int ViewId { get; }
+
+    /// <summary>
     /// 菜单中显示的玩家名称。
     /// </summary>
     internal string DisplayName { get; }
@@ -38,6 +45,8 @@ internal sealed class TeleportPlayerEntry
 
     public override string ToString()
     {
-        return $"{DisplayName} ({ActorNumber})";
+        return
+            $"{DisplayName} " +
+            $"({ActorNumber}, {ViewId})";
     }
 }

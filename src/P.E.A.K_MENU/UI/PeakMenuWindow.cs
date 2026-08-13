@@ -519,10 +519,27 @@ internal sealed class PeakMenuWindow
             return;
         }
 
-        if (!CanSelectCategory(
-                category))
+        if (category ==
+                MenuCategory.Teleport &&
+            !TeleportRuntime.IsInitialized)
         {
+            Plugin.Log.LogWarning(
+                "TeleportRuntime is not initialized."
+            );
+
             return;
+        }
+
+        if (category ==
+            MenuCategory.Teleport)
+        {
+            /*
+             * 无论是否已有其他玩家都允许进入页面；
+             * 刷新结果和等待提示由页面负责显示。
+             */
+            TeleportRuntime
+                .Service
+                .RefreshPlayers();
         }
 
         _selectedCategory =
@@ -556,52 +573,6 @@ internal sealed class PeakMenuWindow
         };
     }
     
-    private static bool CanSelectCategory(
-        MenuCategory category)
-    {
-        /*
-         * 其他分类没有进入限制。
-         */
-        if (category !=
-            MenuCategory.Teleport)
-        {
-            return true;
-        }
-
-        if (!TeleportRuntime.IsInitialized)
-        {
-            Plugin.Log.LogWarning(
-                "Teleport menu blocked: " +
-                "TeleportRuntime is not initialized."
-            );
-
-            return false;
-        }
-
-        /*
-         * 每次点击传送分类时强制扫描。
-         *
-         * 只有确认存在自己以外的玩家，
-         * 才允许切换到传送页面。
-         */
-        bool hasOtherPlayers =
-            TeleportRuntime
-                .Service
-                .CanOpenMenu();
-
-        if (hasOtherPlayers)
-        {
-            return true;
-        }
-
-        Plugin.Log.LogInfo(
-            "Teleport menu blocked: " +
-            "no other players were found."
-        );
-
-        return false;
-    }
-
     private void DrawCurrentPage()
     {
         GUILayout.BeginVertical(
