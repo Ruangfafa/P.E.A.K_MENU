@@ -1,5 +1,6 @@
 ﻿using System;
 using BepInEx.Configuration;
+using P.E.A.K_MENU.Features.Flight;
 using P.E.A.K_MENU.Features.ItemSpawn;
 using P.E.A.K_MENU.UI;
 
@@ -20,6 +21,9 @@ internal static class ModUpdateSettings
 
     private static ConfigEntry<string>?
         _lastAcknowledgedAnnouncementVersion;
+
+    private static ConfigEntry<string>?
+        _lastHoverDownForceResetVersion;
 
     private static ConfigEntry<bool>?
         _showChangelogOnEveryLaunch;
@@ -72,6 +76,14 @@ internal static class ModUpdateSettings
                 "上次已确认关闭版本公告的 Mod 版本。"
             );
 
+        _lastHoverDownForceResetVersion =
+            config.Bind(
+                "Internal",
+                "LastHoverDownForceResetVersion",
+                string.Empty,
+                "上次自动恢复浮空重力默认值时的 Mod 版本。"
+            );
+
         _showChangelogOnEveryLaunch =
             config.Bind(
                 "Debug",
@@ -97,8 +109,13 @@ internal static class ModUpdateSettings
             return;
         }
 
+        ResetHoverDownForceForVersion(
+            config,
+            normalizedVersion
+        );
+
         if (string.Equals(
-                _lastRunVersion.Value,
+            _lastRunVersion.Value,
                 normalizedVersion,
                 StringComparison.OrdinalIgnoreCase))
         {
@@ -155,6 +172,46 @@ internal static class ModUpdateSettings
         Plugin.Log.LogInfo(
             $"Changelog acknowledged for version " +
             $"{_currentVersion}."
+        );
+    }
+
+    private static void ResetHoverDownForceForVersion(
+        ConfigFile config,
+        string normalizedVersion)
+    {
+        if (_lastHoverDownForceResetVersion
+                is null ||
+            string.Equals(
+                _lastHoverDownForceResetVersion.Value,
+                normalizedVersion,
+                StringComparison.OrdinalIgnoreCase
+            ))
+        {
+            return;
+        }
+
+        if (!FlightRuntime.IsInitialized)
+        {
+            Plugin.Log.LogWarning(
+                "Flight configuration is unavailable; " +
+                "the hover calibration reset will be " +
+                "retried next launch."
+            );
+
+            return;
+        }
+
+        FlightRuntime.Service.ResetHoverDownForce();
+
+        _lastHoverDownForceResetVersion.Value =
+            normalizedVersion;
+
+        config.Save();
+
+        Plugin.Log.LogInfo(
+            $"Hover down force was reset to " +
+            $"{FlightService.DefaultHoverDownForce:0.##} " +
+            $"for version {normalizedVersion}."
         );
     }
 

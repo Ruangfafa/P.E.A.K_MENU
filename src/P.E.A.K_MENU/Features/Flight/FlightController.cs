@@ -24,7 +24,7 @@ internal sealed class FlightController :
      * 防止异常输入或速度设置产生过大的作用力。
      */
     private const float MaximumForce =
-        4000f;
+        60000f;
 
     private Character? _character;
 
@@ -79,8 +79,7 @@ internal sealed class FlightController :
         /*
          * 菜单打开时不读取飞行按键。
          *
-         * 当前仍然不施加任何飞行力，
-         * 角色可能受到少量物理影响。
+         * 仍保留原有悬停补偿，避免角色下沉。
          */
         if (MenuState.IsOpen)
         {
@@ -113,57 +112,46 @@ internal sealed class FlightController :
             selectedSpeed *
             FlightForceMultiplier;
 
-        Vector3 flyForce =
-            Vector3.zero;
-
-        Vector3 lookDirection =
-            ResolveLookDirection(
+        Vector3 forwardDirection =
+            ResolveHorizontalForwardDirection(
                 character
             );
 
         /*
-         * W / S 根据视角方向前后移动。
-         *
-         * 因为保留视角的 Y 分量，
-         * 抬头按 W 时也可以向上飞。
+         * WASD 只根据视角的水平朝向移动。
+         * 摄像机俯仰不会再改变飞行高度。
          */
-        if (UnityEngine.Input.GetKey(
-                KeyCode.W))
-        {
-            flyForce +=
-                lookDirection *
-                force;
-        }
-
-        if (UnityEngine.Input.GetKey(
-                KeyCode.S))
-        {
-            flyForce -=
-                lookDirection *
-                force;
-        }
-
         Vector3 rightDirection =
             ResolveRightDirection(
                 character,
-                lookDirection
+                forwardDirection
             );
 
-        if (UnityEngine.Input.GetKey(
-                KeyCode.D))
+        float forwardInput =
+            (UnityEngine.Input.GetKey(KeyCode.W) ? 1f : 0f) -
+            (UnityEngine.Input.GetKey(KeyCode.S) ? 1f : 0f);
+
+        float rightInput =
+            (UnityEngine.Input.GetKey(KeyCode.D) ? 1f : 0f) -
+            (UnityEngine.Input.GetKey(KeyCode.A) ? 1f : 0f);
+
+        Vector3 horizontalDirection =
+            forwardDirection * forwardInput +
+            rightDirection * rightInput;
+
+        /*
+         * 防止斜向飞行比单方向更快。
+         */
+        if (horizontalDirection.sqrMagnitude > 1f)
         {
-            flyForce +=
-                rightDirection *
-                force;
+            horizontalDirection.Normalize();
         }
 
-        if (UnityEngine.Input.GetKey(
-                KeyCode.A))
-        {
-            flyForce -=
-                rightDirection *
-                force;
-        }
+        Vector3 horizontalForce =
+            horizontalDirection * force;
+
+        Vector3 verticalForce =
+            Vector3.zero;
 
         /*
          * Space 上升。
@@ -172,7 +160,7 @@ internal sealed class FlightController :
         if (UnityEngine.Input.GetKey(
                 KeyCode.Space))
         {
-            flyForce +=
+            verticalForce +=
                 Vector3.up *
                 force;
         }
@@ -182,7 +170,7 @@ internal sealed class FlightController :
             UnityEngine.Input.GetKey(
                 KeyCode.RightControl))
         {
-            flyForce +=
+            verticalForce +=
                 Vector3.down *
                 force;
         }
@@ -198,7 +186,10 @@ internal sealed class FlightController :
             UnityEngine.Input.GetKey(
                 KeyCode.RightShift))
         {
-            flyForce *=
+            horizontalForce *=
+                SprintForceMultiplier;
+
+            verticalForce *=
                 SprintForceMultiplier;
 
             RestoreSprintStamina(
@@ -218,27 +209,43 @@ internal sealed class FlightController :
          *
          * 默认速度 16 时：
          * Space 向上力约为 800；
-         * 默认悬停向下补偿为 380；
+         * 默认悬停向下补偿为 237；
          * 因此按 Space 时仍有明显净向上力。
          */
-        flyForce +=
+        verticalForce +=
             Vector3.down *
             hoverDownForce;
 
-        flyForce =
+        horizontalForce =
             ClampForce(
-                flyForce
+                horizontalForce
+            );
+
+        verticalForce =
+            ClampForce(
+                verticalForce
             );
 
         if (!IsFiniteVector(
-                flyForce))
+                horizontalForce) ||
+            !IsFiniteVector(
+                verticalForce))
         {
             return;
         }
 
+        ApplyMassWeightedForceToRagdoll(
+            character,
+            horizontalForce
+        );
+
+        /*
+         * 垂直力保留原有的逐部位施力方式，
+         * 避免改变已经校准好的悬停、上升和下降手感。
+         */
         ApplyForceToRagdoll(
             character,
-            flyForce
+            verticalForce
         );
     }
 
@@ -265,8 +272,7 @@ internal sealed class FlightController :
         Character character,
         Vector3 force)
     {
-        if (!IsFiniteVector(
-                force))
+        if (!IsFiniteVector(force))
         {
             return;
         }
@@ -275,19 +281,13 @@ internal sealed class FlightController :
         {
             if (character.refs is null ||
                 character.refs.ragdoll is null ||
-                character
-                    .refs
-                    .ragdoll
-                    .partList is null)
+                character.refs.ragdoll.partList is null)
             {
                 return;
             }
 
-            foreach (var part
-                     in character
-                         .refs
-                         .ragdoll
-                         .partList)
+            foreach (Bodypart part
+                     in character.refs.ragdoll.partList)
             {
                 if (part is null)
                 {
@@ -309,8 +309,102 @@ internal sealed class FlightController :
         }
     }
 
+    private static void ApplyMassWeightedForceToRagdoll(
+        Character character,
+        Vector3 force)
+    {
+        if (!IsFiniteVector(force) ||
+            force.sqrMagnitude < 0.001f)
+        {
+            return;
+        }
+
+        try
+        {
+            if (character.refs is null ||
+                character.refs.ragdoll is null ||
+                character
+                    .refs
+                    .ragdoll
+                    .partList is null)
+            {
+                return;
+            }
+
+            int partCount = 0;
+            float totalMass = 0f;
+
+            foreach (Bodypart part
+                     in character.refs.ragdoll.partList)
+            {
+                Rigidbody? rigidbody =
+                    ResolveRigidbody(part);
+
+                if (!IsUsableRigidbody(rigidbody))
+                {
+                    continue;
+                }
+
+                partCount++;
+                totalMass += rigidbody!.mass;
+            }
+
+            if (partCount == 0 ||
+                totalMass <= 0f ||
+                float.IsNaN(totalMass) ||
+                float.IsInfinity(totalMass))
+            {
+                /*
+                 * 无法读取质量时退回原有施力逻辑，
+                 * 确保水平飞行不会失效。
+                 */
+                ApplyForceToRagdoll(
+                    character,
+                    force
+                );
+
+                return;
+            }
+
+            /*
+             * 保持施加到整套布娃娃上的总力不变，
+             * 但按质量分配到各部位。
+             * 这样轻量四肢不会获得远高于身体的加速度，
+             * 从而减少肢体摆动对飞行轨迹的影响。
+             */
+            float massWeightScale =
+                partCount / totalMass;
+
+            foreach (Bodypart part
+                     in character.refs.ragdoll.partList)
+            {
+                Rigidbody? rigidbody =
+                    ResolveRigidbody(part);
+
+                if (!IsUsableRigidbody(rigidbody))
+                {
+                    continue;
+                }
+
+                part.AddForce(
+                    force *
+                    rigidbody!.mass *
+                    massWeightScale,
+                    ForceMode.Force
+                );
+            }
+        }
+        catch (System.Exception exception)
+        {
+            Plugin.Log.LogDebug(
+                $"Failed to apply flight force: " +
+                $"{exception.GetBaseException().Message}"
+            );
+        }
+    }
+
     private static Vector3
-        ResolveLookDirection(
+        ResolveHorizontalForwardDirection(
             Character character)
     {
         Vector3 lookDirection =
@@ -338,6 +432,23 @@ internal sealed class FlightController :
                 Vector3.forward;
         }
 
+        lookDirection.y = 0f;
+
+        if (lookDirection.sqrMagnitude <
+            0.001f)
+        {
+            lookDirection =
+                character.transform.forward;
+
+            lookDirection.y = 0f;
+        }
+
+        if (!IsFiniteVector(lookDirection) ||
+            lookDirection.sqrMagnitude < 0.001f)
+        {
+            lookDirection = Vector3.forward;
+        }
+
         lookDirection.Normalize();
 
         return lookDirection;
@@ -346,17 +457,8 @@ internal sealed class FlightController :
     private static Vector3
         ResolveRightDirection(
             Character character,
-            Vector3 lookDirection)
+            Vector3 horizontalLook)
     {
-        /*
-         * 左右移动只使用水平朝向。
-         */
-        Vector3 horizontalLook =
-            lookDirection;
-
-        horizontalLook.y =
-            0f;
-
         if (!IsFiniteVector(
                 horizontalLook) ||
             horizontalLook.sqrMagnitude <
@@ -486,6 +588,26 @@ internal sealed class FlightController :
             );
 
         return force;
+    }
+
+    private static Rigidbody? ResolveRigidbody(
+        Bodypart? part)
+    {
+        return part is null
+            ? null
+            : part.GetComponent<Rigidbody>();
+    }
+
+    private static bool IsUsableRigidbody(
+        Rigidbody? rigidbody)
+    {
+        return
+            rigidbody is not null &&
+            rigidbody.gameObject is not null &&
+            rigidbody.gameObject.activeInHierarchy &&
+            rigidbody.mass > 0f &&
+            !float.IsNaN(rigidbody.mass) &&
+            !float.IsInfinity(rigidbody.mass);
     }
 
     private static bool IsFiniteVector(
