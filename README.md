@@ -2,7 +2,7 @@
 
 A lightweight in-game utility menu for **PEAK**, created by **Ruangfafa**.
 
-The menu currently includes item spawning, player teleportation, coordinate-based flight, status controls, themes, category icons, configurable hotkeys, and a movable/resizable interface.
+The menu currently includes item spawning, player teleportation, physical flight, status controls, configurable blow darts, themes, category icons, configurable hotkeys, and a movable/resizable interface.
 
 > [!WARNING]
 > This mod changes gameplay and may affect multiplayer sessions. Use it only in private or consenting lobbies.
@@ -26,12 +26,12 @@ The menu currently includes item spawning, player teleportation, coordinate-base
 
 ### Flight
 
-- Coordinate-based flight using PEAK's warp RPC
+- Physics-based flight using PEAK's ragdoll forces
 - Optional double-tap `Space` activation mode
 - Adjustable flight speed
 - Default flight speed: `16`
 - Optional mouse-wheel speed control
-- Mouse wheel changes speed by `5`
+- Mouse wheel changes speed by `16`
 - Optional slow-fall effect after flight synchronization
 - Automatically enables and locks invincibility and anti-knockback while flight mode is enabled
 - Restores the previous protection settings when flight mode is disabled
@@ -45,6 +45,15 @@ The menu currently includes item spawning, player teleportation, coordinate-base
 - Configurable status amount and duration
 - Set or additive application modes
 - Clear negative effects
+
+### Blow Dart
+
+- Uses the native in-game blow dart icon and impact visuals
+- Select the original blow dart behavior or one of nine numeric status effects
+- Configure status strength from `1–200`, where `200` maps to the underlying value `2`
+- Apply a configurable whirlwind duration in seconds
+- Only modifies darts fired by the installed player
+- Numeric and whirlwind effects can hit players who do not have the mod installed
 
 ### Menu
 
@@ -61,12 +70,12 @@ The menu currently includes item spawning, player teleportation, coordinate-base
 |---|---|
 | `F6` | Open or close the menu |
 | Double-tap `Space` | Toggle active flight when enabled |
-| `W` / `A` / `S` / `D` | Fly horizontally |
+| `W` / `A` / `S` / `D` | Fly using the selected movement mode |
 | `Space` | Ascend |
 | `Ctrl` | Descend |
 | `Shift` | Accelerate |
-| Mouse wheel up | Increase flight speed by 5 |
-| Mouse wheel down | Decrease flight speed by 5 |
+| Mouse wheel up | Increase flight speed by 16 |
+| Mouse wheel down | Decrease flight speed by 16 |
 
 ## Installation
 

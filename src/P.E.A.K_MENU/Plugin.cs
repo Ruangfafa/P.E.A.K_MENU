@@ -2,6 +2,7 @@ using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using P.E.A.K_MENU.Features.Flight;
+using P.E.A.K_MENU.Features.BlowDart;
 using P.E.A.K_MENU.Features.ItemSpawn;
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.Features.Teleport;
@@ -81,6 +82,13 @@ public partial class Plugin :
         );
 
         InitializeFeature(
+            "BlowDart",
+            () => BlowDartRuntime.Initialize(
+                Config
+            )
+        );
+
+        InitializeFeature(
             "Update defaults",
             () => ModUpdateSettings.Apply(
                 Config,
@@ -138,6 +146,7 @@ public partial class Plugin :
         TeleportRuntime.Update();
         StatusRuntime.Update();
         FlightRuntime.Update();
+        BlowDartRuntime.Update();
     }
 
     private void OnGUI()
@@ -184,6 +193,7 @@ public partial class Plugin :
          * 才能恢复保存的状态。
          */
         FlightRuntime.Dispose();
+        BlowDartRuntime.Dispose();
         ItemSpawnRuntime.Dispose();
         TeleportRuntime.Dispose();
         StatusRuntime.Dispose();
