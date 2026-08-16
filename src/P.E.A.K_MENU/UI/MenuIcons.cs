@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using P.E.A.K_MENU.Features.BlowDart;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI;
@@ -24,6 +25,11 @@ internal static class MenuIcons
 
     internal static Texture2D? Status =>
         Get("status");
+
+    internal static Texture2D? BlowDart =>
+        BlowDartRuntime.IsInitialized
+            ? BlowDartRuntime.Service.Icon
+            : null;
     
     internal static void Initialize()
     {

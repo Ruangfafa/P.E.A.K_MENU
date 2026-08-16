@@ -2,6 +2,7 @@
 using P.E.A.K_MENU.Constants;
 using P.E.A.K_MENU.UI.Pages;
 using P.E.A.K_MENU.Features.Teleport;
+using P.E.A.K_MENU.Features.BlowDart;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI;
@@ -79,6 +80,10 @@ internal sealed class PeakMenuWindow
                 {
                     MenuCategory.Status,
                     new StatusPage()
+                },
+                {
+                    MenuCategory.BlowDart,
+                    new BlowDartPage()
                 },
                 {
                     MenuCategory.Settings,
@@ -426,6 +431,11 @@ internal sealed class PeakMenuWindow
             MenuCategory.Status,
             "状态"
         );
+
+        DrawCategoryButton(
+            MenuCategory.BlowDart,
+            "吹箭"
+        );
         
         GUILayout.FlexibleSpace();
 
@@ -567,6 +577,9 @@ internal sealed class PeakMenuWindow
 
             MenuCategory.Status =>
                 MenuIcons.Status,
+
+            MenuCategory.BlowDart =>
+                MenuIcons.BlowDart,
 
             _ =>
                 null
