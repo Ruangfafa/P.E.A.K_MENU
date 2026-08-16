@@ -29,16 +29,13 @@ internal sealed class FlightService :
         255f;
 
     internal const float DefaultHoverDownForce =
-        237f;
+        255f;
 
     private const float MinimumHoverDownForce =
         0f;
 
     private const float MaximumHoverDownForce =
         500f;
-
-    private const float HoverDownForceStep =
-        1f;
 
     /*
      * 两次空格按下之间的最大间隔。
@@ -50,7 +47,7 @@ internal sealed class FlightService :
      * 滚轮每格增加或减少的速度。
      */
     private const float ScrollSpeedStep =
-        5f;
+        16f;
 
     /*
      * 退出飞行后提供 2 秒缓降。
@@ -69,6 +66,9 @@ internal sealed class FlightService :
 
     private readonly ConfigEntry<float>
         _hoverDownForce;
+
+    private readonly ConfigEntry<bool>
+        _horizontalWasdMovement;
 
     private float _flightSpeed =
         DefaultFlightSpeed;
@@ -110,6 +110,9 @@ internal sealed class FlightService :
             MaximumHoverDownForce
         );
 
+    internal bool HorizontalWasdMovement =>
+        _horizontalWasdMovement.Value;
+
     internal FlightService(
         ConfigFile config)
     {
@@ -125,6 +128,13 @@ internal sealed class FlightService :
                     MaximumHoverDownForce
                 )
             )
+        );
+
+        _horizontalWasdMovement = config.Bind(
+            "Flight",
+            "HorizontalWasdMovement",
+            false,
+            "WASD 是否仅进行水平平移。关闭时 W/S 会跟随视角俯仰。"
         );
     }
 
@@ -228,38 +238,6 @@ internal sealed class FlightService :
         );
     }
 
-    internal void SetFlightSpeed(
-        float speed)
-    {
-        if (float.IsNaN(
-                speed) ||
-            float.IsInfinity(
-                speed))
-        {
-            LastSucceeded =
-                false;
-
-            LastStatus =
-                "飞行速度格式无效。";
-
-            return;
-        }
-
-        _flightSpeed =
-            Mathf.Clamp(
-                speed,
-                MinimumFlightSpeed,
-                MaximumFlightSpeed
-            );
-
-        LastSucceeded =
-            true;
-
-        LastStatus =
-            $"飞行速度已设为 " +
-            $"{_flightSpeed:0.##}。";
-    }
-
     internal void AdjustFlightSpeed(
         float direction)
     {
@@ -306,9 +284,7 @@ internal sealed class FlightService :
         }
 
         _hoverDownForce.Value = Mathf.Clamp(
-            HoverDownForce +
-            Mathf.Sign(direction) *
-            HoverDownForceStep,
+            HoverDownForce + direction,
             MinimumHoverDownForce,
             MaximumHoverDownForce
         );
@@ -317,6 +293,24 @@ internal sealed class FlightService :
         LastStatus =
             $"浮空重力校准已调整为 " +
             $"{HoverDownForce:0.##}。";
+    }
+
+    internal void SetHorizontalWasdMovement(
+        bool horizontal)
+    {
+        if (_horizontalWasdMovement.Value ==
+            horizontal)
+        {
+            return;
+        }
+
+        _horizontalWasdMovement.Value =
+            horizontal;
+
+        LastSucceeded = true;
+        LastStatus = horizontal
+            ? "WASD 已切换为水平平移。"
+            : "WASD 已切换为随视角飞行。";
     }
 
     internal void ResetHoverDownForce()
