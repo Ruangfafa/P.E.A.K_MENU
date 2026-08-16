@@ -153,15 +153,24 @@ internal sealed class ItemSpawnerPage :
         GUILayout.BeginHorizontal();
         GUILayout.FlexibleSpace();
 
+        GUILayout.Label(
+            "左键增加，右键减少",
+            styles.MutedLabel,
+            GUILayout.Height(32f),
+            GUILayout.ExpandWidth(false)
+        );
+
+        GUILayout.Space(8f);
+
         int spawnColumns =
             ItemSpawnConfiguration
                 .SpawnColumns;
 
         Rect columnButtonRect =
             GUILayoutUtility.GetRect(
-                128f,
+                64f,
                 32f,
-                GUILayout.Width(128f),
+                GUILayout.Width(64f),
                 GUILayout.Height(32f)
             );
 
@@ -191,7 +200,7 @@ internal sealed class ItemSpawnerPage :
 
         GUI.Button(
             columnButtonRect,
-            $"列数：{spawnColumns}  左+ / 右-",
+            $"{spawnColumns}列",
             styles.ActionButton
         );
 
