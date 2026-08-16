@@ -211,7 +211,7 @@ internal sealed class FlightPage :
         GUILayout.Space(12f);
 
         GUILayout.Label(
-            "操作：WASD 移动，空格上升，Ctrl 下降，Shift 加速。",
+            "操作：WASD 水平移动，空格上升，Ctrl 下降，Shift 加速。",
             styles.MutedLabel
         );
 
