@@ -43,6 +43,15 @@ internal sealed class ItemSpawnerPage :
     private const float ManagementScrollbarWidth =
         20f;
 
+    private const float ManagementDragHandleWidth =
+        38f;
+
+    private const float ManagementAutoScrollEdge =
+        28f;
+
+    private const float ManagementAutoScrollSpeed =
+        260f;
+
     private Vector2 _spawnScroll;
     private Vector2 _manageScroll;
     private Vector2 _addItemsScroll;
@@ -54,6 +63,15 @@ internal sealed class ItemSpawnerPage :
 
     private string _searchText =
         string.Empty;
+
+    private ItemSpawnEntry? _draggedItem;
+    private bool _draggedFromVisible;
+    private int _dragControlId;
+    private Vector2 _dragMouseScreen;
+
+    private Rect _visibleListScreenRect;
+    private float _visibleListContentHeight;
+    private int _visibleItemCount;
 
     private readonly ShortcutRebindControl
         _shortcutRebind = new();
@@ -421,7 +439,7 @@ internal sealed class ItemSpawnerPage :
         MenuStyles styles)
     {
         GUILayout.Label(
-            "添加、删除或调整主列表的显示顺序。",
+            "拖动三横杠可调整顺序，或将下方物品拖到已显示列表。",
             styles.MutedLabel
         );
 
@@ -506,6 +524,7 @@ internal sealed class ItemSpawnerPage :
 
             _manageScroll = Vector2.zero;
             _addItemsScroll = Vector2.zero;
+            CancelManagementDrag();
         }
     }
 
@@ -590,6 +609,16 @@ internal sealed class ItemSpawnerPage :
             addListRect,
             styles
         );
+
+        /*
+         * 放在两个列表都处理完输入之后绘制，
+         * 这样从下方列表开始的拖拽也能在当前帧
+         * 立即显示与上方排序相同的插入指示线。
+         */
+        DrawManagementDropIndicator(
+            visibleListRect,
+            styles
+        );
     }
 
     private void DrawVisibleItemsList(
@@ -610,6 +639,19 @@ internal sealed class ItemSpawnerPage :
         float contentHeight = Mathf.Max(
             area.height,
             visible.Length * ManagedItemRowHeight
+        );
+
+        _visibleListScreenRect =
+            ConvertToScreenRect(area);
+
+        _visibleListContentHeight =
+            contentHeight;
+
+        _visibleItemCount =
+            visible.Length;
+
+        UpdateManagementAutoScroll(
+            area.height
         );
 
         _manageScroll = GUI.BeginScrollView(
@@ -652,6 +694,7 @@ internal sealed class ItemSpawnerPage :
                         ManagedItemRowHeight
                     ),
                     visible[index],
+                    index,
                     styles
                 );
             }
@@ -725,6 +768,7 @@ internal sealed class ItemSpawnerPage :
                         AddItemRowHeight
                     ),
                     results[index],
+                    index,
                     styles
                 );
             }
@@ -733,11 +777,18 @@ internal sealed class ItemSpawnerPage :
         GUI.EndScrollView();
     }
 
-    private static void DrawManagedItemRow(
+    private void DrawManagedItemRow(
         Rect row,
         ItemSpawnEntry entry,
+        int rowIndex,
         MenuStyles styles)
     {
+        DrawManagementRowBackground(
+            row,
+            rowIndex,
+            styles
+        );
+
         Rect fittedIconRect = new(
             row.x + 2f,
             row.y + 4f,
@@ -758,17 +809,11 @@ internal sealed class ItemSpawnerPage :
             ManagedItemRowHeight
         );
 
-        Rect downRect = new(
-            deleteRect.x - 38f,
+        Rect dragHandleRect = new(
+            deleteRect.x -
+            ManagementDragHandleWidth,
             row.y,
-            38f,
-            ManagedItemRowHeight
-        );
-
-        Rect upRect = new(
-            downRect.x - 38f,
-            row.y,
-            38f,
+            ManagementDragHandleWidth,
             ManagedItemRowHeight
         );
 
@@ -778,7 +823,9 @@ internal sealed class ItemSpawnerPage :
                 row.y,
                 Mathf.Max(
                     0f,
-                    upRect.x - row.x - 34f
+                    dragHandleRect.x -
+                    row.x -
+                    34f
                 ),
                 ManagedItemRowHeight
             ),
@@ -786,31 +833,12 @@ internal sealed class ItemSpawnerPage :
             styles.Label
         );
 
-        if (GUI.Button(
-                upRect,
-                "↑",
-                styles.ActionButton))
-        {
-            ItemSpawnRuntime
-                .Catalog
-                .Move(
-                    entry.PrefabName,
-                    -1
-                );
-        }
-
-        if (GUI.Button(
-                downRect,
-                "↓",
-                styles.ActionButton))
-        {
-            ItemSpawnRuntime
-                .Catalog
-                .Move(
-                    entry.PrefabName,
-                    1
-                );
-        }
+        DrawManagementDragHandle(
+            dragHandleRect,
+            entry,
+            true,
+            styles
+        );
 
         if (GUI.Button(
                 deleteRect,
@@ -857,8 +885,15 @@ internal sealed class ItemSpawnerPage :
     private void DrawAddItemRow(
         Rect row,
         ItemSpawnEntry entry,
+        int rowIndex,
         MenuStyles styles)
     {
+        DrawManagementRowBackground(
+            row,
+            rowIndex,
+            styles
+        );
+
         Rect iconRect = new(
             row.x + 2f,
             row.y + 7f,
@@ -879,18 +914,35 @@ internal sealed class ItemSpawnerPage :
             34f
         );
 
+        Rect dragHandleRect = new(
+            buttonRect.x -
+            ManagementDragHandleWidth,
+            row.y + 4f,
+            ManagementDragHandleWidth,
+            34f
+        );
+
         GUI.Label(
             new Rect(
                 row.x + 38f,
                 row.y,
                 Mathf.Max(
                     0f,
-                    buttonRect.x - row.x - 44f
+                    dragHandleRect.x -
+                    row.x -
+                    44f
                 ),
                 AddItemRowHeight
             ),
             entry.DisplayName,
             styles.Label
+        );
+
+        DrawManagementDragHandle(
+            dragHandleRect,
+            entry,
+            false,
+            styles
         );
 
         if (GUI.Button(
@@ -918,6 +970,300 @@ internal sealed class ItemSpawnerPage :
                 );
         }
 
+    }
+
+    private void DrawManagementDragHandle(
+        Rect handleRect,
+        ItemSpawnEntry entry,
+        bool fromVisible,
+        MenuStyles styles)
+    {
+        int controlId =
+            GUIUtility.GetControlID(
+                FocusType.Passive,
+                handleRect
+            );
+
+        Event currentEvent =
+            Event.current;
+
+        if (_dragControlId == controlId &&
+            _draggedItem is not null)
+        {
+            _dragMouseScreen =
+                GUIUtility.GUIToScreenPoint(
+                    currentEvent.mousePosition
+                );
+        }
+
+        switch (currentEvent.GetTypeForControl(
+                    controlId))
+        {
+            case EventType.MouseDown
+                when currentEvent.button == 0 &&
+                     handleRect.Contains(
+                         currentEvent.mousePosition
+                     ):
+                _draggedItem = entry;
+                _draggedFromVisible =
+                    fromVisible;
+                _dragControlId = controlId;
+                _dragMouseScreen =
+                    GUIUtility.GUIToScreenPoint(
+                        currentEvent.mousePosition
+                    );
+
+                GUIUtility.hotControl =
+                    controlId;
+
+                currentEvent.Use();
+                break;
+
+            case EventType.MouseDrag
+                when GUIUtility.hotControl ==
+                     controlId:
+                _dragMouseScreen =
+                    GUIUtility.GUIToScreenPoint(
+                        currentEvent.mousePosition
+                    );
+
+                currentEvent.Use();
+                break;
+
+            case EventType.MouseUp
+                when GUIUtility.hotControl ==
+                     controlId:
+                _dragMouseScreen =
+                    GUIUtility.GUIToScreenPoint(
+                        currentEvent.mousePosition
+                    );
+
+                CompleteManagementDrag();
+                currentEvent.Use();
+                break;
+        }
+
+        GUI.Box(
+            handleRect,
+            GUIContent.none,
+            styles.ActionButton
+        );
+
+        float lineX =
+            handleRect.center.x - 7f;
+
+        for (int line = -1;
+             line <= 1;
+             line++)
+        {
+            GUI.DrawTexture(
+                new Rect(
+                    lineX,
+                    handleRect.center.y +
+                    line * 5f - 1f,
+                    14f,
+                    2f
+                ),
+                styles.ManagementDropIndicatorTexture,
+                ScaleMode.StretchToFill
+            );
+        }
+    }
+
+    private void CompleteManagementDrag()
+    {
+        ItemSpawnEntry? draggedItem =
+            _draggedItem;
+
+        bool fromVisible =
+            _draggedFromVisible;
+
+        if (draggedItem is not null &&
+            _visibleListScreenRect.Contains(
+                _dragMouseScreen
+            ))
+        {
+            int insertionIndex =
+                GetManagementDropIndex();
+
+            bool changed =
+                ItemSpawnRuntime
+                    .Catalog
+                    .PlaceAt(
+                        draggedItem.PrefabName,
+                        insertionIndex
+                    );
+
+            if (changed)
+            {
+                _managementStatus =
+                    fromVisible
+                        ? $"已调整：{draggedItem.DisplayName}"
+                        : $"已添加：{draggedItem.DisplayName}";
+            }
+        }
+
+        CancelManagementDrag();
+    }
+
+    private void CancelManagementDrag()
+    {
+        if (GUIUtility.hotControl ==
+            _dragControlId)
+        {
+            GUIUtility.hotControl = 0;
+        }
+
+        _draggedItem = null;
+        _draggedFromVisible = false;
+        _dragControlId = 0;
+    }
+
+    private void UpdateManagementAutoScroll(
+        float viewportHeight)
+    {
+        if (_draggedItem is null ||
+            !_visibleListScreenRect.Contains(
+                _dragMouseScreen
+            ))
+        {
+            return;
+        }
+
+        float distanceFromTop =
+            _dragMouseScreen.y -
+            _visibleListScreenRect.yMin;
+
+        float distanceFromBottom =
+            _visibleListScreenRect.yMax -
+            _dragMouseScreen.y;
+
+        float direction =
+            distanceFromTop <
+            ManagementAutoScrollEdge
+                ? -1f
+                : distanceFromBottom <
+                  ManagementAutoScrollEdge
+                    ? 1f
+                    : 0f;
+
+        if (direction == 0f)
+        {
+            return;
+        }
+
+        float maxScroll = Mathf.Max(
+            0f,
+            _visibleListContentHeight -
+            viewportHeight
+        );
+
+        _manageScroll.y = Mathf.Clamp(
+            _manageScroll.y +
+            direction *
+            ManagementAutoScrollSpeed *
+            Time.unscaledDeltaTime,
+            0f,
+            maxScroll
+        );
+    }
+
+    private void DrawManagementDropIndicator(
+        Rect visibleListRect,
+        MenuStyles styles)
+    {
+        if (_draggedItem is null ||
+            !_visibleListScreenRect.Contains(
+                _dragMouseScreen
+            ))
+        {
+            return;
+        }
+
+        int insertionIndex =
+            GetManagementDropIndex();
+
+        float indicatorY =
+            visibleListRect.y +
+            insertionIndex *
+            ManagedItemRowHeight -
+            _manageScroll.y;
+
+        indicatorY = Mathf.Clamp(
+            indicatorY,
+            visibleListRect.y + 1.5f,
+            visibleListRect.yMax - 1.5f
+        );
+
+        GUI.DrawTexture(
+            new Rect(
+                visibleListRect.x,
+                indicatorY - 1.5f,
+                Mathf.Max(
+                    1f,
+                    visibleListRect.width -
+                    ManagementScrollbarWidth
+                ),
+                3f
+            ),
+            styles.ManagementDropIndicatorTexture,
+            ScaleMode.StretchToFill
+        );
+    }
+
+    private int GetManagementDropIndex()
+    {
+        float contentY =
+            _dragMouseScreen.y -
+            _visibleListScreenRect.yMin +
+            _manageScroll.y;
+
+        return Mathf.Clamp(
+            Mathf.RoundToInt(
+                contentY /
+                ManagedItemRowHeight
+            ),
+            0,
+            _visibleItemCount
+        );
+    }
+
+    private static Rect ConvertToScreenRect(
+        Rect rect)
+    {
+        Vector2 screenPosition =
+            GUIUtility.GUIToScreenPoint(
+                rect.position
+            );
+
+        return new Rect(
+            screenPosition,
+            rect.size
+        );
+    }
+
+    private static void DrawManagementRowBackground(
+        Rect row,
+        int rowIndex,
+        MenuStyles styles)
+    {
+        Texture2D? background =
+            row.Contains(
+                Event.current.mousePosition
+            )
+                ? styles.ManagementRowHoverTexture
+                : rowIndex % 2 == 1
+                    ? styles.ManagementRowAlternateTexture
+                    : null;
+
+        if (background is not null)
+        {
+            GUI.DrawTexture(
+                row,
+                background,
+                ScaleMode.StretchToFill
+            );
+        }
     }
 
     private static bool MatchesSearch(

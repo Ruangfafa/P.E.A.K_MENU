@@ -132,6 +132,79 @@ internal sealed class ItemCatalogService :
         );
     }
 
+    /// <summary>
+    /// 将物品插入指定的列表间隙。
+    /// 已显示的物品会移动到该位置，
+    /// 未显示的物品会直接添加到该位置。
+    /// </summary>
+    internal bool PlaceAt(
+        string prefabName,
+        int insertionIndex)
+    {
+        ItemSpawnEntry? entry =
+            FindByPrefabName(prefabName);
+
+        if (entry is null)
+        {
+            return false;
+        }
+
+        int currentIndex =
+            _visibleNames.FindIndex(
+                name =>
+                    string.Equals(
+                        name,
+                        prefabName,
+                        StringComparison
+                            .OrdinalIgnoreCase
+                    )
+            );
+
+        int targetIndex = Math.Max(
+            0,
+            Math.Min(
+                _visibleNames.Count,
+                insertionIndex
+            )
+        );
+
+        if (currentIndex >= 0)
+        {
+            if (currentIndex < targetIndex)
+            {
+                targetIndex--;
+            }
+
+            if (currentIndex == targetIndex)
+            {
+                return false;
+            }
+
+            _visibleNames.RemoveAt(
+                currentIndex
+            );
+        }
+
+        targetIndex = Math.Min(
+            targetIndex,
+            _visibleNames.Count
+        );
+
+        _visibleNames.Insert(
+            targetIndex,
+            entry.PrefabName
+        );
+
+        Save();
+
+        Plugin.Log.LogInfo(
+            $"Placed item in ItemSpawn list: " +
+            $"{entry.PrefabName} at {targetIndex}"
+        );
+
+        return true;
+    }
+
     internal void Remove(
         string prefabName)
     {
