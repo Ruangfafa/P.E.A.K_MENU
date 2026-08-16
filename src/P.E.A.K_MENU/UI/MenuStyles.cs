@@ -28,6 +28,9 @@ internal sealed class MenuStyles
     internal GUIStyle WindowTitleNormal { get; }
 
     internal Texture2D SeparatorTexture { get; }
+    internal Texture2D ManagementRowAlternateTexture { get; }
+    internal Texture2D ManagementRowHoverTexture { get; }
+    internal Texture2D ManagementDropIndicatorTexture { get; }
 
     private readonly Texture2D _windowBackground;
     private readonly Texture2D _sidebarBackground;
@@ -89,6 +92,27 @@ internal sealed class MenuStyles
 
         SeparatorTexture =
             CreateTexture(palette.Separator);
+
+        ManagementRowAlternateTexture =
+            CreateTexture(
+                Color.Lerp(
+                    palette.Content,
+                    palette.Button,
+                    0.4f
+                )
+            );
+
+        ManagementRowHoverTexture =
+            CreateTexture(
+                Color.Lerp(
+                    palette.Content,
+                    palette.ButtonHover,
+                    0.55f
+                )
+            );
+
+        ManagementDropIndicatorTexture =
+            CreateTexture(palette.AccentHover);
 
         Window = CreateWindowStyle();
         Sidebar = CreateSidebarStyle();
@@ -910,6 +934,9 @@ internal sealed class MenuStyles
         DestroyTexture(_resizeHoverBackground);
 
         DestroyTexture(SeparatorTexture);
+        DestroyTexture(ManagementRowAlternateTexture);
+        DestroyTexture(ManagementRowHoverTexture);
+        DestroyTexture(ManagementDropIndicatorTexture);
     }
 
     private static void ApplyBackgroundToAllStates(

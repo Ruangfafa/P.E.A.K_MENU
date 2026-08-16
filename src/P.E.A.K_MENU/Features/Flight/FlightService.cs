@@ -29,7 +29,7 @@ internal sealed class FlightService :
         255f;
 
     internal const float DefaultHoverDownForce =
-        380f;
+        237f;
 
     private const float MinimumHoverDownForce =
         0f;
