@@ -31,11 +31,18 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\Icons\*.png" />
+    <EmbeddedResource
+      Include="$(SolutionRoot)CHANGELOG.md"
+      LogicalName="P.E.A.K_MENU.CHANGELOG.md" />
+    <EmbeddedResource
+      Include="$(SolutionRoot)ANNOUNCEMENTS.md"
+      LogicalName="P.E.A.K_MENU.ANNOUNCEMENTS.md" />
   </ItemGroup>
 
   <ItemGroup>
     <ThunderstorePackageFile Include="$(SolutionRoot)README.md" />
     <ThunderstorePackageFile Include="$(SolutionRoot)CHANGELOG.md" />
+    <ThunderstorePackageFile Include="$(SolutionRoot)ANNOUNCEMENTS.md" />
     <ThunderstorePackageFile Include="$(SolutionRoot)icon.png" />
     <ThunderstorePackageFile Include="$(SolutionRoot)LICENSE" />
 

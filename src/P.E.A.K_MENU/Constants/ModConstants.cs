@@ -5,6 +5,8 @@ namespace P.E.A.K_MENU.Constants;
 internal static class ModConstants
 {
     internal const int WindowId = 938421;
+    internal const int ChangelogWindowId = 938422;
+    internal const int AnnouncementWindowId = 938423;
 
     internal const float DefaultWindowWidth = 850f;
     internal const float DefaultWindowHeight = 850f;

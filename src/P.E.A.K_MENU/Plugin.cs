@@ -30,6 +30,12 @@ public partial class Plugin :
     private FeatureShortcutController
         _featureShortcutController = null!;
 
+    private ChangelogOverlay
+        _changelogOverlay = null!;
+
+    private AnnouncementOverlay
+        _announcementOverlay = null!;
+
     private Harmony
         _harmony = null!;
 
@@ -93,6 +99,12 @@ public partial class Plugin :
         _featureShortcutController =
             new FeatureShortcutController();
 
+        _changelogOverlay =
+            new ChangelogOverlay();
+
+        _announcementOverlay =
+            new AnnouncementOverlay();
+
         _harmony =
             new Harmony(
                 "ruangfafa.peakmenu"
@@ -107,9 +119,21 @@ public partial class Plugin :
 
     private void Update()
     {
-        _inputController.Update();
+        _changelogOverlay.Update();
+
+        _announcementOverlay.Update(
+            canShow:
+                !_changelogOverlay.IsVisible
+        );
+
+        if (!_changelogOverlay.IsVisible &&
+            !_announcementOverlay.IsVisible)
+        {
+            _inputController.Update();
+            _featureShortcutController.Update();
+        }
+
         _menuWindow.Update();
-        _featureShortcutController.Update();
 
         TeleportRuntime.Update();
         StatusRuntime.Update();
@@ -119,15 +143,25 @@ public partial class Plugin :
     private void OnGUI()
     {
         _menuWindow.Draw();
+        _changelogOverlay.Draw();
+        _announcementOverlay.Draw();
     }
 
     private void LateUpdate()
     {
         _menuWindow.LateUpdate();
+        _changelogOverlay.LateUpdate();
+        _announcementOverlay.LateUpdate();
     }
 
     private void OnDisable()
     {
+        _changelogOverlay
+            ?.HideWithoutAcknowledging();
+
+        _announcementOverlay
+            ?.HideWithoutAcknowledging();
+
         MenuState.IsOpen = false;
         MenuState.IsRebinding = false;
 
@@ -140,6 +174,8 @@ public partial class Plugin :
         MenuState.IsRebinding = false;
 
         _menuWindow?.Dispose();
+        _changelogOverlay?.Dispose();
+        _announcementOverlay?.Dispose();
         
         MenuIcons.Dispose();
 
