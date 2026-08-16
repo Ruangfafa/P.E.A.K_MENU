@@ -1,4 +1,3 @@
-using System.Globalization;
 using P.E.A.K_MENU.Features.Flight;
 using P.E.A.K_MENU.Input;
 using UnityEngine;
@@ -8,8 +7,16 @@ namespace P.E.A.K_MENU.UI.Pages;
 internal sealed class FlightPage :
     IMenuPage
 {
-    private string _speedInput =
-        "16";
+    private static readonly float[]
+        GravityCalibrationSteps =
+        {
+            -9f,
+            -3f,
+            -1f,
+            1f,
+            3f,
+            9f
+        };
 
     private bool _showGravityCalibration;
 
@@ -104,35 +111,56 @@ internal sealed class FlightPage :
         GUILayout.Space(12f);
 
         GUILayout.Label(
-            "飞行速度",
+            "WASD 移动方式",
             styles.Label
         );
 
         GUILayout.Space(4f);
-
         GUILayout.BeginHorizontal();
 
-        _speedInput =
-            GUILayout.TextField(
-                _speedInput,
+        if (GUILayout.Button(
+                "随视角飞行",
+                service.HorizontalWasdMovement
+                    ? styles.ThemeButton
+                    : styles.ThemeButtonSelected,
                 GUILayout.Height(36f),
-                GUILayout.ExpandWidth(true)
+                GUILayout.ExpandWidth(true)))
+        {
+            service.SetHorizontalWasdMovement(
+                false
             );
+        }
 
         if (GUILayout.Button(
-                "确定",
-                styles.ActionButton,
-                GUILayout.Width(76f),
-                GUILayout.Height(36f)))
+                "水平平移",
+                service.HorizontalWasdMovement
+                    ? styles.ThemeButtonSelected
+                    : styles.ThemeButton,
+                GUILayout.Height(36f),
+                GUILayout.ExpandWidth(true)))
         {
-            ApplySpeed(
-                service
+            service.SetHorizontalWasdMovement(
+                true
             );
         }
 
         GUILayout.EndHorizontal();
 
-        GUILayout.Space(8f);
+        GUILayout.Label(
+            service.HorizontalWasdMovement
+                ? "WASD 只改变水平位置，高度由空格和 Ctrl 控制。"
+                : "W/S 跟随视角俯仰，A/D 保持水平移动。",
+            styles.MutedLabel
+        );
+
+        GUILayout.Space(12f);
+
+        GUILayout.Label(
+            "飞行速度",
+            styles.Label
+        );
+
+        GUILayout.Space(4f);
 
         GUILayout.Label(
             $"当前速度：{service.FlightSpeed:0.##}",
@@ -140,7 +168,7 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "调整范围为 16–255；实际飞行时，每次提高或降低 5 点。",
+            "调整范围为 16–255；实际飞行时，每次提高或降低 16 点。",
             styles.MutedLabel
         );
 
@@ -211,7 +239,7 @@ internal sealed class FlightPage :
         GUILayout.Space(12f);
 
         GUILayout.Label(
-            "操作：WASD 水平移动，空格上升，Ctrl 下降，Shift 加速。",
+            "操作：WASD 按所选方式移动，空格上升，Ctrl 下降，Shift 加速。",
             styles.MutedLabel
         );
 
@@ -313,7 +341,7 @@ internal sealed class FlightPage :
         );
 
         GUILayout.Label(
-            "为避免误调，仅可在实际飞行状态下每次微调 1 点。",
+            "仅可在实际飞行状态下校准；可按不同步长快速微调。",
             styles.MutedLabel
         );
 
@@ -324,20 +352,22 @@ internal sealed class FlightPage :
             service.Enabled &&
             service.ActivelyFlying;
 
-        if (GUILayout.Button(
-                "减少 1",
-                styles.ActionButton,
-                GUILayout.Height(34f)))
+        foreach (float step in
+                 GravityCalibrationSteps)
         {
-            service.AdjustHoverDownForce(-1f);
-        }
+            string label =
+                step > 0f
+                    ? $"+{step:0}"
+                    : $"{step:0}";
 
-        if (GUILayout.Button(
-                "增加 1",
-                styles.ActionButton,
-                GUILayout.Height(34f)))
-        {
-            service.AdjustHoverDownForce(1f);
+            if (GUILayout.Button(
+                    label,
+                    styles.ActionButton,
+                    GUILayout.Height(34f),
+                    GUILayout.ExpandWidth(true)))
+            {
+                service.AdjustHoverDownForce(step);
+            }
         }
 
         GUI.enabled = true;
@@ -371,40 +401,4 @@ internal sealed class FlightPage :
             "正常状态 / 等待双击空格";
     }
 
-    private void ApplySpeed(
-        FlightService service)
-    {
-        bool parsed =
-            float.TryParse(
-                _speedInput,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out float speed
-            ) ||
-            float.TryParse(
-                _speedInput,
-                NumberStyles.Float,
-                CultureInfo.CurrentCulture,
-                out speed
-            );
-
-        if (!parsed)
-        {
-            service.SetFlightSpeed(
-                float.NaN
-            );
-
-            return;
-        }
-
-        service.SetFlightSpeed(
-            speed
-        );
-
-        _speedInput =
-            service.FlightSpeed.ToString(
-                "0.##",
-                CultureInfo.InvariantCulture
-            );
-    }
 }
