@@ -95,7 +95,6 @@ internal static class ItemSpawnDefaults
         "Lantern",
         "Lantern_Faerie",
         "Lollipop",
-        "Lollipop_Prop",
         "MagicBean",
         "Mandrake",
         "Marshmallow",
