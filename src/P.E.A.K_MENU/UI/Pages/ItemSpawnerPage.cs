@@ -10,6 +10,10 @@ namespace P.E.A.K_MENU.UI.Pages;
 internal sealed class ItemSpawnerPage :
     IMenuPage
 {
+    private string _spawnSearch = string.Empty;
+    private Vector2 _searchAddedScroll;
+    private Vector2 _searchOtherScroll;
+
     private const float ItemRowHeight =
         56f;
 
@@ -23,7 +27,7 @@ internal sealed class ItemSpawnerPage :
         22f;
 
     private const float ManagementSearchHeight =
-        32f;
+        36f;
 
     private const float ManagementSectionSpacing =
         10f;
@@ -80,6 +84,8 @@ internal sealed class ItemSpawnerPage :
         _managementOpen
             ? "物品管理"
             : "物品生成";
+
+    internal void LeavePage() { _managementOpen = false; CancelManagementDrag(); MenuState.IsRebinding = false; }
 
     public void Draw(
         MenuStyles styles)
@@ -232,36 +238,33 @@ internal sealed class ItemSpawnerPage :
                     .Catalog
                     .GetVisibleItems();
 
-        /*
-         * 只有物品列表使用滚动区域。
-         * 底部状态和物品管理按钮始终固定显示。
-         */
-        _spawnScroll =
-            GUILayout.BeginScrollView(
-                _spawnScroll,
-                false,
-                true,
-                GUILayout.ExpandWidth(true),
-                GUILayout.ExpandHeight(true)
-            );
-
-        if (entries.Count == 0)
+        Rect spawnSearchRect = GUILayoutUtility.GetRect(1f, ManagementSearchHeight,
+            GUILayout.Height(ManagementSearchHeight), GUILayout.ExpandWidth(true));
+        string search = DrawItemSearchBar(spawnSearchRect, _spawnSearch, styles);
+        if (search != _spawnSearch)
         {
-            GUILayout.Label(
-                "物品数据库尚未准备好。" +
-                "请进入关卡后重新打开菜单。",
-                styles.MutedLabel
-            );
+            _spawnSearch = search;
+            _searchAddedScroll = _searchOtherScroll = Vector2.zero;
+        }
+        string query = _spawnSearch.Trim();
+        if (query.Length > 0)
+        {
+            var added = entries.Where(item => MatchesSpawnSearch(item, query)).ToArray();
+            var other = ItemSpawnRuntime.Catalog.AllItems.Where(item =>
+                !ItemSpawnRuntime.Catalog.ContainsVisible(item.PrefabName) && MatchesSpawnSearch(item, query)).ToArray();
+            DrawSearchPartition("已添加", added, ref _searchAddedScroll, styles);
+            GUILayout.Space(8f);
+            DrawSearchPartition("未添加", other, ref _searchOtherScroll, styles);
         }
         else
         {
-            DrawSpawnGrid(
-                entries,
-                styles
-            );
+            using (var scroll = new GUILayout.ScrollViewScope(_spawnScroll, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true)))
+            {
+                _spawnScroll = scroll.scrollPosition;
+                if (entries.Count == 0) GUILayout.Label("物品数据库尚未准备好，或面板暂无物品。", styles.MutedLabel);
+                else DrawSpawnGrid(entries, styles);
+            }
         }
-
-        GUILayout.EndScrollView();
 
         GUILayout.Space(6f);
 
@@ -290,6 +293,38 @@ internal sealed class ItemSpawnerPage :
 
             _manageScroll = Vector2.zero;
             _addItemsScroll = Vector2.zero;
+        }
+    }
+
+    private static string DrawItemSearchBar(Rect row, string text, MenuStyles styles)
+    {
+        const float labelWidth = 40f;
+        const float clearWidth = 64f;
+        const float gap = 6f;
+        GUI.Label(new Rect(row.x, row.y, labelWidth, row.height), "搜索", styles.Label);
+        Rect clearRect = new(row.xMax - clearWidth, row.y, clearWidth, row.height);
+        Rect inputRect = new(row.x + labelWidth + gap, row.y,
+            Mathf.Max(1f, row.width - labelWidth - clearWidth - gap * 2f), row.height);
+        string result = GUI.TextField(inputRect, text, styles.TextField);
+        if (GUI.Button(clearRect, "清空", styles.ActionButton))
+        {
+            result = string.Empty;
+            GUI.FocusControl(null);
+        }
+        return result;
+    }
+    private static bool MatchesSpawnSearch(ItemSpawnEntry item, string query) =>
+        item.DisplayName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
+        item.PrefabName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private static void DrawSearchPartition(string title, ItemSpawnEntry[] items, ref Vector2 position, MenuStyles styles)
+    {
+        GUILayout.Label($"{title}（{items.Length}）", styles.Label);
+        using (var scroll = new GUILayout.ScrollViewScope(position, GUILayout.Height(Mathf.Clamp(Screen.height * 0.2f, 120f, 240f)), GUILayout.ExpandWidth(true)))
+        {
+            position = scroll.scrollPosition;
+            if (items.Length == 0) GUILayout.Label("没有匹配物品。", styles.MutedLabel);
+            else DrawSpawnGrid(items, styles);
         }
     }
 
@@ -358,7 +393,7 @@ internal sealed class ItemSpawnerPage :
     {
         if (GUI.Button(
                 row,
-                GUIContent.none,
+                new GUIContent(string.Empty, entry.PrefabName),
                 styles.ActionButton))
         {
             ItemSpawnRuntime
@@ -394,7 +429,7 @@ internal sealed class ItemSpawnerPage :
 
         GUI.Label(
             labelRect,
-            entry.DisplayName,
+            new GUIContent(entry.DisplayName, entry.PrefabName),
             styles.Label
         );
     }
@@ -600,10 +635,12 @@ internal sealed class ItemSpawnerPage :
             styles.Label
         );
 
-        _searchText = GUI.TextField(
-            searchRect,
-            _searchText
-        );
+        string search = DrawItemSearchBar(searchRect, _searchText, styles);
+        if (search != _searchText)
+        {
+            _searchText = search;
+            _addItemsScroll = Vector2.zero;
+        }
 
         DrawAddItemsList(
             addListRect,
@@ -823,15 +860,17 @@ internal sealed class ItemSpawnerPage :
                 row.y,
                 Mathf.Max(
                     0f,
-                    dragHandleRect.x -
+                    dragHandleRect.x - 118f -
                     row.x -
                     34f
                 ),
                 ManagedItemRowHeight
             ),
-            entry.DisplayName,
+            new GUIContent(entry.DisplayName, entry.PrefabName),
             styles.Label
         );
+
+        ItemShortcuts.Draw(new Rect(dragHandleRect.x - 116f, row.y + 2f, 112f, 30f), entry, styles);
 
         DrawManagementDragHandle(
             dragHandleRect,
@@ -928,15 +967,17 @@ internal sealed class ItemSpawnerPage :
                 row.y,
                 Mathf.Max(
                     0f,
-                    dragHandleRect.x -
+                    dragHandleRect.x - 118f -
                     row.x -
                     44f
                 ),
                 AddItemRowHeight
             ),
-            entry.DisplayName,
+            new GUIContent(entry.DisplayName, entry.PrefabName),
             styles.Label
         );
+
+        ItemShortcuts.Draw(new Rect(dragHandleRect.x - 116f, row.y + 2f, 112f, 30f), entry, styles);
 
         DrawManagementDragHandle(
             dragHandleRect,

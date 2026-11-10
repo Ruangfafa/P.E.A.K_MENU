@@ -1,4 +1,4 @@
-using P.E.A.K_MENU.Features.Flight;
+﻿using P.E.A.K_MENU.Features.Flight;
 using P.E.A.K_MENU.Features.ItemSpawn;
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.UI;
@@ -9,15 +9,21 @@ internal sealed class FeatureShortcutController
 {
     internal void Update()
     {
-        if (MenuState.IsOpen ||
+        if (TeleportSelector.IsHeld || TeleportSelector.IsOpen || MenuState.IsOpen ||
             MenuState.IsRebinding)
         {
+            UI.Pages.KickPage.CancelInput();
             return;
         }
 
+        if (Features.BlowDart.BlowDartRuntime.IsInitialized && FeatureInputSettings.IsPressed(FeatureShortcutAction.GiveBlowDart))
+            Features.BlowDart.BlowDartRuntime.Service.GiveBlowDart();
+
+        UI.Pages.KickPage.UpdateInput();
         UpdateFlightShortcuts();
         UpdateStatusShortcuts();
         UpdateItemSpawnShortcuts();
+        ItemShortcuts.Update();
     }
 
     private static void UpdateFlightShortcuts()

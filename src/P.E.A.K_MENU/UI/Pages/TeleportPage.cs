@@ -14,12 +14,20 @@ internal sealed class TeleportPage :
         58f;
 
     private Vector2 _playerScroll;
+    private readonly ShortcutRebindControl _shortcut = new();
 
     public string Title => "传送";
 
     public void Draw(
         MenuStyles styles)
     {
+        _shortcut.CaptureEvent();
+        using (new GUILayout.HorizontalScope())
+        {
+            GUILayout.Label("按住选择玩家", styles.Label, GUILayout.ExpandWidth(true));
+            _shortcut.DrawButtons(Input.FeatureShortcutAction.TeleportSelector, styles);
+        }
+        GUILayout.Label("按住快捷键选择玩家，左键去、右键来，松开关闭。请绑定键盘键，滚轮和鼠标左右键不支持长按选择。", styles.MutedLabel);
         if (!TeleportRuntime.IsInitialized)
         {
             GUILayout.Label(
@@ -29,6 +37,19 @@ internal sealed class TeleportPage :
 
             return;
         }
+
+        GUILayout.Label(Photon.Pun.PhotonNetwork.IsMasterClient ? "当前为房主" : "当前不是房主", styles.NoticeLabel);
+        if (Photon.Pun.PhotonNetwork.IsMasterClient)
+        {
+            bool value = GUILayout.Toggle(TeleportNetwork.Free, "自由传送（允许房间成员请求房主代执行）", styles.Toggle);
+            if (value != TeleportNetwork.Free) TeleportNetwork.SetFree(value);
+        }
+        else GUILayout.Label(
+            !Photon.Pun.PhotonNetwork.InRoom ? "当前不在房间中。" :
+            !TeleportNetwork.HostSupportsTeleport ? "未检测到房主支持代执行：无法将其他玩家传送过来。" :
+            TeleportNetwork.Free ? "房主自由传送已开启：可请求房主将玩家传送过来。" :
+            "房主已关闭自由传送：仅可传送过去，拉人按钮已隐藏。",
+            styles.NoticeLabel);
 
         TeleportService service =
             TeleportRuntime.Service;

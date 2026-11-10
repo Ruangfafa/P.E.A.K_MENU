@@ -24,6 +24,7 @@ internal sealed class PeakMenuWindow
     private readonly Dictionary<MenuCategory, IMenuPage>
         _pages;
 
+    private readonly Dictionary<MenuCategory, Vector2> _pageScroll = new();
     private MenuStyles? _styles;
     private MenuTheme _loadedTheme;
 
@@ -65,6 +66,7 @@ internal sealed class PeakMenuWindow
         _pages =
             new Dictionary<MenuCategory, IMenuPage>
             {
+                { MenuCategory.Kick, new KickPage() },
                 {
                     MenuCategory.ItemSpawner,
                     new ItemSpawnerPage()
@@ -264,6 +266,7 @@ internal sealed class PeakMenuWindow
 
     private void FinishClose()
     {
+        ((ItemSpawnerPage)_pages[MenuCategory.ItemSpawner]).LeavePage();
         _isOpen = false;
         _closeAfterMouseRelease = false;
 
@@ -321,6 +324,8 @@ internal sealed class PeakMenuWindow
         }
 
         DrawResizeHandle();
+        // Draw last inside the window: ordinary GUI outside GUI.Window is behind it.
+        DrawItemTooltip();
     }
 
     private void DrawCustomTitleBar()
@@ -437,6 +442,7 @@ internal sealed class PeakMenuWindow
             "吹箭"
         );
         
+        DrawCategoryButton(MenuCategory.Kick, "踹人");
         GUILayout.FlexibleSpace();
 
         DrawCategoryButton(
@@ -552,6 +558,7 @@ internal sealed class PeakMenuWindow
                 .RefreshPlayers();
         }
 
+        ((ItemSpawnerPage)_pages[MenuCategory.ItemSpawner]).LeavePage();
         _selectedCategory =
             category;
 
@@ -578,6 +585,7 @@ internal sealed class PeakMenuWindow
             MenuCategory.Status =>
                 MenuIcons.Status,
 
+            MenuCategory.Kick => MenuIcons.Kick,
             MenuCategory.BlowDart =>
                 MenuIcons.BlowDart,
 
@@ -586,6 +594,70 @@ internal sealed class PeakMenuWindow
         };
     }
     
+    private void DrawItemTooltip()
+    {
+        if (_selectedCategory != MenuCategory.ItemSpawner || string.IsNullOrEmpty(GUI.tooltip) ||
+            Event.current.type != EventType.Repaint ||
+            !new Rect(0f, 0f, _windowRect.width, _windowRect.height).Contains(Event.current.mousePosition)) return;
+        var style = new GUIStyle(Styles.Label)
+        {
+            fontSize = 13,
+            fontStyle = FontStyle.Normal,
+            alignment = TextAnchor.UpperLeft,
+            wordWrap = false,
+            richText = false,
+            fixedWidth = 0f,
+            fixedHeight = 0f,
+            padding = new RectOffset(0, 0, 0, 0),
+            margin = new RectOffset(0, 0, 0, 0)
+        };
+        string text = "ID: " + GUI.tooltip;
+        float width = Mathf.Min(Mathf.Max(120f, style.CalcSize(new GUIContent(text)).x + 24f),
+            Mathf.Min(420f, _windowRect.width - 16f));
+        string wrapped;
+        float height;
+        do
+        {
+            wrapped = WrapTooltipText(text, style, width - 24f);
+            int lines = wrapped.Split('\n').Length;
+            height = Mathf.Ceil(Mathf.Max(style.CalcHeight(new GUIContent(wrapped), width - 24f),
+                lines * Mathf.Max(style.lineHeight, style.fontSize + 3f))) + 20f;
+            if (height <= _windowRect.height - 16f || style.fontSize <= 1) break;
+            style.fontSize--;
+        } while (true);
+        Vector2 mouse = Event.current.mousePosition;
+        float x = Mathf.Clamp(mouse.x + 16f, 8f, Mathf.Max(8f, _windowRect.width - width - 8f));
+        float y = mouse.y + 22f;
+        if (y + height > _windowRect.height - 8f) y = mouse.y - height - 12f;
+        y = Mathf.Clamp(y, 8f, Mathf.Max(8f, _windowRect.height - height - 8f));
+        GUI.Box(new Rect(x, y, width, height), GUIContent.none, Styles.Content);
+        GUI.Label(new Rect(x + 12f, y + 10f, width - 24f, height - 20f), wrapped, style);
+    }
+
+    private static string WrapTooltipText(string text, GUIStyle style, float width)
+    {
+        var result = new System.Text.StringBuilder();
+        var line = new System.Text.StringBuilder();
+        var elements = System.Globalization.StringInfo.GetTextElementEnumerator(text.Replace("\r", ""));
+        while (elements.MoveNext())
+        {
+            string element = elements.GetTextElement();
+            if (element == "\n")
+            {
+                result.Append(line).Append('\n');
+                line.Clear();
+                continue;
+            }
+            if (line.Length > 0 && style.CalcSize(new GUIContent(line.ToString() + element)).x > width)
+            {
+                result.Append(line).Append('\n');
+                line.Clear();
+            }
+            line.Append(element);
+        }
+        return result.Append(line).ToString();
+    }
+
     private void DrawCurrentPage()
     {
         GUILayout.BeginVertical(
@@ -616,7 +688,18 @@ internal sealed class PeakMenuWindow
 
         GUILayout.Space(12f);
 
-        page.Draw(Styles);
+        _pageScroll.TryGetValue(_selectedCategory, out Vector2 scroll);
+        using (var viewport = new GUILayout.ScrollViewScope(scroll,
+                   GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true)))
+        {
+            _pageScroll[_selectedCategory] = viewport.scrollPosition;
+            // Keep action/shortcut/reset rows readable at the minimum window size.
+            using (new GUILayout.VerticalScope(GUILayout.MinWidth(560f),
+                       GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true)))
+            {
+                page.Draw(Styles);
+            }
+        }
 
         GUILayout.EndVertical();
     }

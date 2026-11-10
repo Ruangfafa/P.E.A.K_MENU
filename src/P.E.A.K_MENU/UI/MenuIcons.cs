@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,6 +13,8 @@ internal static class MenuIcons
     private static readonly Dictionary<
         string,
         Texture2D> Icons = new();
+
+    internal static Texture2D? Kick => Get("kick");
 
     internal static Texture2D? Item =>
         Get("item");
@@ -50,6 +52,7 @@ internal static class MenuIcons
             $"{string.Join(", ", resourceNames)}"
         );
 
+        Load(assembly, "kick", "kick.png");
         Load(
             assembly,
             "item",

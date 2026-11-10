@@ -234,3 +234,4 @@ Config.Build.user.props
 **/bin/
 **/obj/
 Config.Build.user.props
+.tools/

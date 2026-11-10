@@ -1,4 +1,4 @@
-namespace P.E.A.K_MENU.Input;
+﻿namespace P.E.A.K_MENU.Input;
 
 internal enum FeatureShortcutAction
 {
@@ -11,5 +11,9 @@ internal enum FeatureShortcutAction
     ToggleInfiniteStamina,
     ReviveSelf,
     ToggleWeightOverride,
-    SpawnLastItem
+    SpawnLastItem,
+    TeleportSelector,
+    ToggleKick,
+    Kick,
+    GiveBlowDart
 }

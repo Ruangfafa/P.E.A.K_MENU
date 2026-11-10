@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using BepInEx.Configuration;
 
 namespace P.E.A.K_MENU.Input;
@@ -29,6 +29,12 @@ internal static class FeatureInputSettings
         ConfigFile config)
     {
         Bindings.Clear();
+        Bind(config, FeatureShortcutAction.TeleportSelector, "TeleportSelector", "None");
+        UI.Pages.KickPage.Initialize(config);
+        Bind(config, FeatureShortcutAction.ToggleKick, "ToggleKick", "None");
+        Bind(config, FeatureShortcutAction.Kick, "Kick", "None");
+        ItemShortcuts.Initialize(config);
+        Bind(config, FeatureShortcutAction.GiveBlowDart, "GiveBlowDart", FeatureInputBinding.NoneValue);
 
         _doubleTapFlightEnabled = config.Bind(
             "Flight.Input",

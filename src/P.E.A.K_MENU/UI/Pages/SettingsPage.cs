@@ -1,4 +1,3 @@
-using P.E.A.K_MENU.Constants;
 using UnityEngine;
 
 namespace P.E.A.K_MENU.UI.Pages;
@@ -6,6 +5,7 @@ namespace P.E.A.K_MENU.UI.Pages;
 internal sealed class SettingsPage : IMenuPage
 {
     private bool _waitingForKey;
+    private bool _themeDropdownOpen;
 
     public string Title => "设置";
 
@@ -29,139 +29,68 @@ internal sealed class SettingsPage : IMenuPage
         DrawWindowSizeSection(styles);
     }
 
-    private static void DrawThemeSection(
-        MenuStyles styles)
+    private void DrawThemeSection(MenuStyles styles)
     {
-        GUILayout.Label(
-            "主题色",
-            styles.Label
-        );
-
+        GUILayout.Label("主题色", styles.Label);
         GUILayout.Space(6f);
 
-        GUILayout.Label(
-            $"当前主题：{GetThemeDisplayName(MenuSettings.Theme)}",
-            styles.MutedLabel
-        );
-
-        GUILayout.Space(8f);
-
-        GUILayout.BeginHorizontal();
-
-        DrawThemeButton(
-            styles,
-            MenuTheme.Iris,
-            "鸢尾花"
-        );
-
-        DrawThemeButton(
-            styles,
-            MenuTheme.Ocean,
-            "海洋"
-        );
-
-        GUILayout.EndHorizontal();
-
-        GUILayout.BeginHorizontal();
-
-        DrawThemeButton(
-            styles,
-            MenuTheme.Emerald,
-            "翡翠"
-        );
-
-        DrawThemeButton(
-            styles,
-            MenuTheme.Rose,
-            "玫瑰"
-        );
-
-        GUILayout.EndHorizontal();
-
-        GUILayout.BeginHorizontal();
-
-        DrawThemeButton(
-            styles,
-            MenuTheme.Amber,
-            "琥珀"
-        );
-
-        GUILayout.FlexibleSpace();
-
-        GUILayout.EndHorizontal();
-
-        GUILayout.Space(6f);
-
-        if (GUILayout.Button(
-                "恢复默认主题（鸢尾花）",
-                styles.ActionButton,
-                GUILayout.Height(36f)))
+        using (new GUILayout.HorizontalScope(GUILayout.Height(38f)))
         {
-            MenuSettings.ResetTheme();
+            if (GUILayout.Button(
+                    GetThemeDisplayName(MenuSettings.Theme) + (_themeDropdownOpen ? " ▴" : " ▾"),
+                    styles.ActionButton, GUILayout.Height(38f), GUILayout.ExpandWidth(true)))
+            {
+                _themeDropdownOpen = !_themeDropdownOpen;
+            }
+            if (GUILayout.Button("恢复默认", styles.ActionButton,
+                    GUILayout.Width(100f), GUILayout.Height(38f)))
+            {
+                MenuSettings.ResetTheme();
+                _themeDropdownOpen = false;
+            }
+        }
+
+        if (!_themeDropdownOpen) return;
+        foreach (MenuTheme theme in System.Enum.GetValues(typeof(MenuTheme)))
+        {
+            if (GUILayout.Button(GetThemeDisplayName(theme),
+                    MenuSettings.Theme == theme ? styles.ThemeButtonSelected : styles.ThemeButton,
+                    GUILayout.Height(34f), GUILayout.ExpandWidth(true)))
+            {
+                MenuSettings.SetTheme(theme);
+                _themeDropdownOpen = false;
+            }
         }
     }
 
-    private static void DrawThemeButton(
-        MenuStyles styles,
-        MenuTheme theme,
-        string label)
+    private void DrawShortcutSection(MenuStyles styles)
     {
-        bool selected =
-            MenuSettings.Theme == theme;
-
-        GUIStyle style = selected
-            ? styles.ThemeButtonSelected
-            : styles.ThemeButton;
-
-        if (GUILayout.Button(
-                label,
-                style,
-                GUILayout.Height(38f),
-                GUILayout.ExpandWidth(true)))
-        {
-            MenuSettings.SetTheme(theme);
-        }
-    }
-
-    private void DrawShortcutSection(
-        MenuStyles styles)
-    {
-        GUILayout.Label(
-            "菜单快捷键",
-            styles.Label
-        );
-
+        if (_waitingForKey) CaptureKeyEvent();
+        GUILayout.Label("菜单快捷键", styles.Label);
         GUILayout.Space(6f);
 
         string buttonText = _waitingForKey
             ? "请按下新的快捷键..."
             : $"当前快捷键：{MenuSettings.ToggleKey}";
 
-        if (GUILayout.Button(
-                buttonText,
-                styles.ActionButton,
-                GUILayout.Height(40f)))
+        using (new GUILayout.HorizontalScope(GUILayout.Height(38f)))
         {
-            BeginRebind();
+            if (GUILayout.Button(buttonText, styles.ActionButton,
+                    GUILayout.Height(38f), GUILayout.ExpandWidth(true)))
+            {
+                BeginRebind();
+            }
+            if (GUILayout.Button("恢复默认", styles.ActionButton,
+                    GUILayout.Width(100f), GUILayout.Height(38f)))
+            {
+                CancelRebind();
+                MenuSettings.ResetToggleKey();
+            }
         }
 
         if (_waitingForKey)
         {
-            GUILayout.Label(
-                "按下任意按键完成绑定，按 Esc 取消。",
-                styles.MutedLabel
-            );
-
-            CaptureKeyEvent();
-        }
-
-        if (GUILayout.Button(
-                $"恢复默认快捷键（{ModConstants.DefaultToggleMenuKey}）",
-                styles.ActionButton,
-                GUILayout.Height(36f)))
-        {
-            CancelRebind();
-            MenuSettings.ResetToggleKey();
+            GUILayout.Label("按下任意按键完成绑定，按 Esc 取消。", styles.MutedLabel);
         }
     }
 

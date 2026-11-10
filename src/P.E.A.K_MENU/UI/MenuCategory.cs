@@ -7,5 +7,6 @@ internal enum MenuCategory
     Flight,
     Status,
     BlowDart,
+    Kick,
     Settings
 }

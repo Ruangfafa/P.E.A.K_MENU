@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using P.E.A.K_MENU.UI;
@@ -77,7 +77,7 @@ internal static class CharacterInputPatch
     /// </summary>
     private static bool Prefix(object __instance)
     {
-        if (!MenuState.IsOpen)
+        if (!MenuState.IsOpen && !TeleportSelector.IsOpen && !TeleportSelector.IsHeld)
         {
             return true;
         }

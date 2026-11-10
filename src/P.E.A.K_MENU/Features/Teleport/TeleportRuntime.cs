@@ -1,4 +1,4 @@
-namespace P.E.A.K_MENU.Features.Teleport;
+﻿namespace P.E.A.K_MENU.Features.Teleport;
 
 /// <summary>
 /// Teleport 功能的全局运行入口。
@@ -34,6 +34,7 @@ internal static class TeleportRuntime
             return;
         }
 
+        TeleportNetwork.Initialize();
         _service =
             new TeleportService();
 
@@ -44,11 +45,13 @@ internal static class TeleportRuntime
 
     internal static void Update()
     {
+        TeleportNetwork.Update();
         _service?.Update();
     }
 
     internal static void Dispose()
     {
+        TeleportNetwork.Dispose();
         _service?.Clear();
         _service = null;
 

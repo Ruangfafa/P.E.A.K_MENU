@@ -497,16 +497,17 @@ internal sealed class ItemCatalogService :
             );
     }
 
-    private static string ResolveDisplayName(
-        Item item)
+    private static string ResolveDisplayName(Item item)
     {
-        /*
-         * 第一版先使用 prefab 名称。
-         *
-         * 后续确认 PEAK 当前版本的本地化接口后，
-         * 可以在这里改成游戏本地化显示名称。
-         */
-        return item.name ??
-               "Unknown Item";
+        string rawName = item.UIData?.itemName ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(rawName))
+        {
+            string key = LocalizedText.GetNameIndex(rawName);
+            string chinese = LocalizedText.GetText(key, LocalizedText.Language.SimplifiedChinese);
+            if (!string.IsNullOrWhiteSpace(chinese) && !string.Equals(chinese, key, StringComparison.OrdinalIgnoreCase))
+                return chinese;
+            return rawName;
+        }
+        return item.name ?? "Unknown Item";
     }
 }

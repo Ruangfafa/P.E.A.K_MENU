@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿
 using P.E.A.K_MENU.Features.Status;
 using P.E.A.K_MENU.Input;
 using UnityEngine;
@@ -10,10 +10,7 @@ internal sealed class StatusPage :
 {
     private Vector2 _pageScroll;
 
-    private string _weightInput =
-        "0";
-
-    private readonly ShortcutRebindControl
+private readonly ShortcutRebindControl
         _shortcutRebind = new();
 
     public string Title =>
@@ -303,71 +300,17 @@ internal sealed class StatusPage :
         GUI.enabled =
             service.WeightOverrideEnabled;
 
-        GUILayout.BeginHorizontal();
-
-        _weightInput =
-            GUILayout.TextField(
-                _weightInput,
-                GUILayout.Height(36f),
-                GUILayout.ExpandWidth(true)
-            );
-
-        if (GUILayout.Button(
-                "确定",
-                styles.ActionButton,
-                GUILayout.Width(76f),
-                GUILayout.Height(36f)))
-        {
-            ApplyWeight(
-                service
-            );
-        }
-
-        GUILayout.EndHorizontal();
+        GUILayout.Label($"{service.CustomWeight:0.#}% / 200%", styles.Label);
+        float nextWeight = Mathf.Round(GUILayout.HorizontalSlider(service.CustomWeight, 0f, 200f) / 2.5f) * 2.5f;
+        if (service.WeightOverrideEnabled && nextWeight != service.CustomWeight) service.SetWeight(nextWeight);
 
         GUI.enabled =
             true;
 
         GUILayout.Label(
-            "输入 0 可实现无负重。",
+            "滑动即时生效，每 2.5 一档；0 为无负重。",
             styles.MutedLabel
         );
     }
 
-    private void ApplyWeight(
-        StatusService service)
-    {
-        bool parsed =
-            float.TryParse(
-                _weightInput,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out float weight
-            ) ||
-            float.TryParse(
-                _weightInput,
-                NumberStyles.Float,
-                CultureInfo.CurrentCulture,
-                out weight
-            );
-
-        if (!parsed)
-        {
-            service.SetInputError(
-                "负重格式无效。"
-            );
-
-            return;
-        }
-
-        service.SetWeight(
-            weight
-        );
-
-        _weightInput =
-            weight.ToString(
-                "0.###",
-                CultureInfo.InvariantCulture
-            );
-    }
 }

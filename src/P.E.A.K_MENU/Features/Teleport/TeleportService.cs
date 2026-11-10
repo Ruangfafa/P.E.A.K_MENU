@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Photon.Pun;
@@ -283,6 +283,13 @@ internal sealed class TeleportService
             return;
         }
 
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            LastSucceeded = TeleportNetwork.Request(freshTarget!.ViewId);
+            LastStatus = LastSucceeded ? "Request sent to host." : "Host has disabled free teleport.";
+            return;
+        }
+
         Vector3 localPosition =
             ResolveCharacterWorldPosition(
                 localCharacter
@@ -469,6 +476,16 @@ internal sealed class TeleportService
 
         try
         {
+            if (character.IsLocal && !PhotonNetwork.IsMasterClient)
+            {
+                HarmonyLib.AccessTools.Method(typeof(Character), "WarpPlayer", new[] { typeof(Vector3), typeof(bool) }).Invoke(character, new object[] { destination, false });
+                return true;
+            }
+            if (!PhotonNetwork.IsMasterClient)
+            {
+                error = "Only the host can bring another player with this game version.";
+                return false;
+            }
             photonView.RPC(
                 "WarpPlayerRPC",
                 RpcTarget.All,
@@ -492,7 +509,7 @@ internal sealed class TeleportService
         }
     }
 
-    private static Vector3
+    internal static Vector3
         CalculateArrivalPosition(
             Character anchor,
             Character movingCharacter)
@@ -518,101 +535,27 @@ internal sealed class TeleportService
                 ? 1f
                 : -1f;
 
-        return
-            anchorPosition +
-            sideDirection *
-            HorizontalArrivalOffset *
-            directionSign +
-            Vector3.up *
-            VerticalArrivalOffset;
+        Vector3 offset = sideDirection * HorizontalArrivalOffset * directionSign;
+        // Keep the destination close to the actual player, including on custom maps.
+        foreach (Vector3 candidate in new[] { offset, -offset, Vector3.zero })
+        {
+            Vector3 destination = anchorPosition + candidate + Vector3.up * VerticalArrivalOffset;
+            if (Physics.Linecast(anchorPosition, destination, out var hit, ~0, QueryTriggerInteraction.Ignore) &&
+                hit.collider.GetComponentInParent<Character>() == null) continue;
+            bool blocked = false;
+            foreach (var collider in Physics.OverlapSphere(destination, 0.3f, ~0, QueryTriggerInteraction.Ignore))
+                if (collider.GetComponentInParent<Character>() == null) { blocked = true; break; }
+            if (!blocked) return destination;
+        }
+        return anchorPosition;
+
     }
 
     private static Vector3
         ResolveCharacterWorldPosition(
             Character character)
     {
-        Rigidbody[] rigidbodies =
-            character.GetComponentsInChildren<
-                Rigidbody>(
-                    true
-                );
-
-        if (rigidbodies.Length == 0)
-        {
-            return character
-                .transform
-                .position;
-        }
-
-        string[] preferredBodyNames =
-        {
-            "hip",
-            "hips",
-            "pelvis",
-            "torso",
-            "chest",
-            "body"
-        };
-
-        foreach (string preferredName
-                 in preferredBodyNames)
-        {
-            foreach (Rigidbody rigidbody
-                     in rigidbodies)
-            {
-                if (!IsUsableBodyRigidbody(
-                        rigidbody))
-                {
-                    continue;
-                }
-
-                string rigidbodyName =
-                    rigidbody.name ??
-                    string.Empty;
-
-                if (!rigidbodyName.Contains(
-                        preferredName,
-                        StringComparison
-                            .OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                return rigidbody
-                    .worldCenterOfMass;
-            }
-        }
-
-        Vector3 positionSum =
-            Vector3.zero;
-
-        int validCount = 0;
-
-        foreach (Rigidbody rigidbody
-                 in rigidbodies)
-        {
-            if (!IsUsableBodyRigidbody(
-                    rigidbody))
-            {
-                continue;
-            }
-
-            positionSum +=
-                rigidbody.worldCenterOfMass;
-
-            validCount++;
-        }
-
-        if (validCount > 0)
-        {
-            return
-                positionSum /
-                validCount;
-        }
-
-        return character
-            .transform
-            .position;
+        return character.Center;
     }
 
     private static bool

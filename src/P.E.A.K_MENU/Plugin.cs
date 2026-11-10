@@ -1,4 +1,4 @@
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using P.E.A.K_MENU.Features.Flight;
@@ -141,6 +141,7 @@ public partial class Plugin :
             _featureShortcutController.Update();
         }
 
+        TeleportSelector.Update(!_changelogOverlay.IsVisible && !_announcementOverlay.IsVisible);
         _menuWindow.Update();
 
         TeleportRuntime.Update();
@@ -151,6 +152,8 @@ public partial class Plugin :
 
     private void OnGUI()
     {
+        UI.Pages.KickPage.DrawAim();
+        TeleportSelector.Draw();
         _menuWindow.Draw();
         _changelogOverlay.Draw();
         _announcementOverlay.Draw();
@@ -158,6 +161,7 @@ public partial class Plugin :
 
     private void LateUpdate()
     {
+        TeleportSelector.LateUpdate();
         _menuWindow.LateUpdate();
         _changelogOverlay.LateUpdate();
         _announcementOverlay.LateUpdate();
@@ -165,6 +169,8 @@ public partial class Plugin :
 
     private void OnDisable()
     {
+        TeleportSelector.Close();
+        UI.Pages.KickPage.HideLockName();
         _changelogOverlay
             ?.HideWithoutAcknowledging();
 

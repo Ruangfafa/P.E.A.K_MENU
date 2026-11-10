@@ -1,9 +1,10 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace P.E.A.K_MENU.UI;
 
 internal sealed class MenuStyles
 {
+    private static readonly Color AccentText = new Color32(0x07, 0x10, 0x19, 0xFF);
     internal GUIStyle Window { get; }
     internal GUIStyle Sidebar { get; }
     internal GUIStyle Content { get; }
@@ -12,15 +13,20 @@ internal sealed class MenuStyles
     internal GUIStyle CategoryButtonSelected { get; }
 
     internal GUIStyle ActionButton { get; }
+    internal GUIStyle ConfirmationButton { get; }
     internal GUIStyle Toggle { get; }
+    internal GUIStyle TextField { get; }
 
     internal GUIStyle ThemeButton { get; }
     internal GUIStyle ThemeButtonSelected { get; }
 
     internal GUIStyle Title { get; }
+    internal GUIStyle SectionTitle { get; }
     internal GUIStyle SidebarTitle { get; }
     internal GUIStyle Label { get; }
     internal GUIStyle MutedLabel { get; }
+    internal GUIStyle NoticeLabel { get; }
+    internal GUIStyle GiftBadge { get; }
 
     internal GUIStyle ResizeHandle { get; }
 
@@ -28,6 +34,11 @@ internal sealed class MenuStyles
     internal GUIStyle WindowTitleNormal { get; }
 
     internal Texture2D SeparatorTexture { get; }
+    internal Texture2D SectionDividerTexture { get; }
+    internal Texture2D SectionAccentTexture { get; }
+    internal Texture2D MasterSwitchOnTexture { get; }
+    internal Texture2D MasterSwitchOffTexture { get; }
+    internal Texture2D MasterSwitchKnobTexture { get; }
     internal Texture2D ManagementRowAlternateTexture { get; }
     internal Texture2D ManagementRowHoverTexture { get; }
     internal Texture2D ManagementDropIndicatorTexture { get; }
@@ -39,6 +50,8 @@ internal sealed class MenuStyles
     private readonly Texture2D _buttonBackground;
     private readonly Texture2D _buttonHoverBackground;
     private readonly Texture2D _buttonActiveBackground;
+    private readonly Texture2D _inputFocusBackground;
+    private readonly Texture2D _confirmationBackground;
 
     private readonly Texture2D _accentBackground;
     private readonly Texture2D _accentHoverBackground;
@@ -55,34 +68,37 @@ internal sealed class MenuStyles
             ThemePalette.Create(theme);
 
         _windowBackground =
-            CreateTexture(palette.Window);
+            CreateRoundedTexture(palette.Window, palette.Line, 18, 1, 64);
 
         _sidebarBackground =
-            CreateTexture(palette.Sidebar);
+            CreateRoundedTexture(palette.Sidebar, palette.Line, 14, 1, 48);
 
         _contentBackground =
-            CreateTexture(palette.Content);
+            CreateRoundedTexture(palette.Content, palette.Line, 18, 1, 64);
 
         _buttonBackground =
-            CreateTexture(palette.Button);
+            CreateRoundedTexture(palette.Button, palette.Line, 11, 1, 40);
 
         _buttonHoverBackground =
-            CreateTexture(palette.ButtonHover);
+            CreateRoundedTexture(palette.ButtonHover, palette.LineHover, 11, 1, 40);
 
         _buttonActiveBackground =
-            CreateTexture(palette.ButtonActive);
+            CreateRoundedTexture(palette.ButtonActive, palette.Accent, 11, 1, 40);
+
+        _inputFocusBackground =
+            CreateRoundedTexture(palette.Button, palette.Accent, 11, 2, 40);
 
         _accentBackground =
-            CreateTexture(palette.Accent);
+            CreateGradientRoundedTexture(palette.Accent, palette.AccentSecondary, 11, 0, 40);
 
         _accentHoverBackground =
-            CreateTexture(palette.AccentHover);
+            CreateGradientRoundedTexture(palette.AccentHover, palette.AccentSecondaryHover, 11, 0, 40);
 
         _toggleOffBackground =
-            CreateTexture(palette.ToggleOff);
+            CreateRoundedTexture(palette.ToggleOff, palette.Line, 11, 1, 40);
 
         _toggleHoverBackground =
-            CreateTexture(palette.ToggleHover);
+            CreateRoundedTexture(palette.ToggleHover, palette.LineHover, 11, 1, 40);
 
         _resizeBackground =
             CreateTexture(palette.Resize);
@@ -90,25 +106,26 @@ internal sealed class MenuStyles
         _resizeHoverBackground =
             CreateTexture(palette.AccentHover);
 
-        SeparatorTexture =
-            CreateTexture(palette.Separator);
+        SeparatorTexture = CreateTexture(palette.Separator);
+        SectionDividerTexture = CreateGradientRoundedTexture(palette.Accent,
+            palette.AccentSecondary, 2, 0, 64);
+        SectionAccentTexture = CreateGradientRoundedTexture(palette.Accent,
+            palette.AccentSecondary, 2, 0, 64);
+        MasterSwitchOnTexture = CreateRoundedTexture(palette.AccentSecondary,
+            palette.AccentSecondaryHover, 5, 1, 40);
+        MasterSwitchOffTexture = CreateRoundedTexture(palette.ToggleOff,
+            palette.LineHover, 5, 1, 40);
+        MasterSwitchKnobTexture = CreateRoundedTexture(Color.white,
+            new Color32(0xD8, 0xE0, 0xEC, 0xFF), 4, 1, 40);
 
         ManagementRowAlternateTexture =
             CreateTexture(
-                Color.Lerp(
-                    palette.Content,
-                    palette.Button,
-                    0.4f
-                )
+                Color.Lerp(palette.Content, palette.Button, 0.5f)
             );
 
         ManagementRowHoverTexture =
             CreateTexture(
-                Color.Lerp(
-                    palette.Content,
-                    palette.ButtonHover,
-                    0.55f
-                )
+                Color.Lerp(palette.Content, palette.ButtonHover, 0.72f)
             );
 
         ManagementDropIndicatorTexture =
@@ -126,9 +143,16 @@ internal sealed class MenuStyles
 
         ActionButton =
             CreateActionButtonStyle();
+        _confirmationBackground = CreateRoundedTexture(new Color32(0xF7, 0x54, 0x64, 0xFF),
+            new Color32(0xFB, 0x71, 0x85, 0xFF), 11, 1, 40);
+        ConfirmationButton = new GUIStyle(ActionButton);
+        ApplyBackgroundToAllStates(ConfirmationButton, _confirmationBackground, Color.white);
 
         Toggle =
             CreateToggleStyle();
+
+        TextField =
+            CreateTextFieldStyle();
 
         ThemeButton =
             CreateThemeButtonStyle();
@@ -139,6 +163,9 @@ internal sealed class MenuStyles
         Title =
             CreateTitleStyle();
 
+        SectionTitle =
+            CreateSectionTitleStyle();
+
         SidebarTitle =
             CreateSidebarTitleStyle();
 
@@ -147,6 +174,12 @@ internal sealed class MenuStyles
 
         MutedLabel =
             CreateMutedLabelStyle();
+
+        NoticeLabel = new GUIStyle(Label) { fontStyle = FontStyle.Bold, wordWrap = true };
+        NoticeLabel.normal.textColor = Color.Lerp(palette.AccentHover, Color.white, 0.4f);
+
+        GiftBadge =
+            CreateGiftBadgeStyle();
 
         ResizeHandle =
             CreateResizeHandleStyle();
@@ -165,18 +198,13 @@ internal sealed class MenuStyles
             fontSize = 14,
             alignment = TextAnchor.UpperCenter,
 
-            border = new RectOffset(
-                0,
-                0,
-                0,
-                0
-            ),
+            border = new RectOffset(18, 18, 18, 18),
 
             padding = new RectOffset(
-                12,
-                12,
-                30,
-                12
+                16,
+                16,
+                34,
+                16
             ),
 
             margin = new RectOffset(
@@ -207,23 +235,18 @@ internal sealed class MenuStyles
     {
         var style = new GUIStyle(GUI.skin.box)
         {
-            border = new RectOffset(
-                0,
-                0,
-                0,
-                0
-            ),
+            border = new RectOffset(14, 14, 14, 14),
 
             padding = new RectOffset(
-                10,
-                10,
-                10,
-                10
+                12,
+                12,
+                14,
+                14
             ),
 
             margin = new RectOffset(
                 0,
-                8,
+                12,
                 0,
                 0
             ),
@@ -249,18 +272,13 @@ internal sealed class MenuStyles
     {
         var style = new GUIStyle(GUI.skin.box)
         {
-            border = new RectOffset(
-                0,
-                0,
-                0,
-                0
-            ),
+            border = new RectOffset(18, 18, 18, 18),
 
             padding = new RectOffset(
-                16,
-                16,
-                14,
-                14
+                20,
+                20,
+                18,
+                18
             ),
 
             margin = new RectOffset(
@@ -292,13 +310,13 @@ internal sealed class MenuStyles
         var style = new GUIStyle(GUI.skin.button)
         {
             alignment =
-                TextAnchor.MiddleLeft,
+                TextAnchor.MiddleCenter,
 
             imagePosition =
                 ImagePosition.TextOnly,
 
             padding = new RectOffset(
-                44,
+                10,
                 10,
                 5,
                 5
@@ -311,12 +329,7 @@ internal sealed class MenuStyles
                 3
             ),
 
-            border = new RectOffset(
-                0,
-                0,
-                0,
-                0
-            ),
+            border = new RectOffset(11, 11, 11, 11),
 
             overflow = new RectOffset(
                 0,
@@ -326,11 +339,10 @@ internal sealed class MenuStyles
             ),
 
             fontSize = 14,
-            fontStyle = FontStyle.Normal
+            fontStyle = FontStyle.Bold
         };
 
-        Color normalText =
-            new(0.84f, 0.86f, 0.90f);
+        Color normalText = new Color32(0xED, 0xF2, 0xFF, 0xFF);
 
         SetState(
             style.normal,
@@ -393,7 +405,7 @@ internal sealed class MenuStyles
         ApplyBackgroundToAllStates(
             style,
             _accentBackground,
-            Color.white
+            AccentText
         );
 
         return style;
@@ -419,12 +431,7 @@ internal sealed class MenuStyles
                 4
             ),
 
-            border = new RectOffset(
-                0,
-                0,
-                0,
-                0
-            ),
+            border = new RectOffset(11, 11, 11, 11),
 
             overflow = new RectOffset(
                 0,
@@ -434,11 +441,10 @@ internal sealed class MenuStyles
             ),
 
             fontSize = 14,
-            fontStyle = FontStyle.Normal
+            fontStyle = FontStyle.Bold
         };
 
-        Color normalText =
-            new(0.88f, 0.90f, 0.94f);
+        Color normalText = new Color32(0xED, 0xF2, 0xFF, 0xFF);
 
         SetState(
             style.normal,
@@ -511,12 +517,7 @@ internal sealed class MenuStyles
                 4
             ),
 
-            border = new RectOffset(
-                0,
-                0,
-                0,
-                0
-            ),
+            border = new RectOffset(11, 11, 11, 11),
 
             overflow = new RectOffset(
                 0,
@@ -528,8 +529,7 @@ internal sealed class MenuStyles
             fontSize = 14
         };
 
-        Color normalText =
-            new(0.86f, 0.88f, 0.92f);
+        Color normalText = new Color32(0xED, 0xF2, 0xFF, 0xFF);
 
         SetState(
             style.normal,
@@ -558,27 +558,45 @@ internal sealed class MenuStyles
         SetState(
             style.onNormal,
             _accentBackground,
-            Color.white
+            AccentText
         );
 
         SetState(
             style.onHover,
             _accentHoverBackground,
-            Color.white
+            AccentText
         );
 
         SetState(
             style.onActive,
             _accentHoverBackground,
-            Color.white
+            AccentText
         );
 
         SetState(
             style.onFocused,
             _accentBackground,
-            Color.white
+            AccentText
         );
 
+        return style;
+    }
+
+    private GUIStyle CreateTextFieldStyle()
+    {
+        var style = new GUIStyle(GUI.skin.textField)
+        {
+            alignment = TextAnchor.MiddleLeft,
+            padding = new RectOffset(13, 13, 8, 8),
+            border = new RectOffset(11, 11, 11, 11),
+            fontSize = 14
+        };
+
+        Color text = new Color32(0xED, 0xF2, 0xFF, 0xFF);
+        SetState(style.normal, _buttonBackground, text);
+        SetState(style.hover, _buttonHoverBackground, Color.white);
+        SetState(style.active, _buttonActiveBackground, Color.white);
+        SetState(style.focused, _inputFocusBackground, Color.white);
         return style;
     }
 
@@ -601,7 +619,7 @@ internal sealed class MenuStyles
         ApplyBackgroundToAllStates(
             style,
             _accentBackground,
-            Color.white
+            AccentText
         );
 
         return style;
@@ -611,7 +629,7 @@ internal sealed class MenuStyles
     {
         var style = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 20,
+            fontSize = 22,
             fontStyle = FontStyle.Bold,
             alignment = TextAnchor.MiddleLeft,
 
@@ -630,6 +648,26 @@ internal sealed class MenuStyles
             Color.white
         );
 
+        return style;
+    }
+
+    private static GUIStyle CreateSectionTitleStyle()
+    {
+        var style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 16,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleLeft,
+            wordWrap = false,
+            clipping = TextClipping.Clip,
+            fixedHeight = 0f,
+            stretchWidth = true,
+            stretchHeight = true,
+            padding = new RectOffset(0, 0, 0, 0),
+            margin = new RectOffset(0, 0, 0, 0)
+        };
+        ClearAllStateBackgrounds(style);
+        ApplyTextColorToAllStates(style, Color.white);
         return style;
     }
 
@@ -653,11 +691,7 @@ internal sealed class MenuStyles
 
         ApplyTextColorToAllStates(
             style,
-            new Color(
-                0.78f,
-                0.81f,
-                0.87f
-            )
+            new Color32(0x98, 0xA6, 0xBE, 0xFF)
         );
 
         return style;
@@ -676,11 +710,7 @@ internal sealed class MenuStyles
 
         ApplyTextColorToAllStates(
             style,
-            new Color(
-                0.86f,
-                0.88f,
-                0.92f
-            )
+            new Color32(0xED, 0xF2, 0xFF, 0xFF)
         );
 
         return style;
@@ -699,13 +729,26 @@ internal sealed class MenuStyles
 
         ApplyTextColorToAllStates(
             style,
-            new Color(
-                0.58f,
-                0.61f,
-                0.68f
-            )
+            new Color32(0x98, 0xA6, 0xBE, 0xFF)
         );
 
+        return style;
+    }
+
+    private GUIStyle CreateGiftBadgeStyle()
+    {
+        var style = new GUIStyle(GUI.skin.box)
+        {
+            fontSize = 12,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            padding = new RectOffset(6, 6, 2, 2),
+            margin = new RectOffset(6, 2, 1, 1)
+        };
+
+        style.border = new RectOffset(11, 11, 11, 11);
+
+        ApplyBackgroundToAllStates(style, _accentBackground, AccentText);
         return style;
     }
 
@@ -804,7 +847,7 @@ internal sealed class MenuStyles
     {
         var style = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 14,
+            fontSize = 17,
             fontStyle = FontStyle.Bold,
             alignment = TextAnchor.MiddleLeft,
 
@@ -904,11 +947,7 @@ internal sealed class MenuStyles
 
         ApplyTextColorToAllStates(
             style,
-            new Color(
-                0.72f,
-                0.74f,
-                0.80f
-            )
+            new Color32(0x98, 0xA6, 0xBE, 0xFF)
         );
 
         return style;
@@ -923,6 +962,8 @@ internal sealed class MenuStyles
         DestroyTexture(_buttonBackground);
         DestroyTexture(_buttonHoverBackground);
         DestroyTexture(_buttonActiveBackground);
+        DestroyTexture(_inputFocusBackground);
+        DestroyTexture(_confirmationBackground);
 
         DestroyTexture(_accentBackground);
         DestroyTexture(_accentHoverBackground);
@@ -934,6 +975,11 @@ internal sealed class MenuStyles
         DestroyTexture(_resizeHoverBackground);
 
         DestroyTexture(SeparatorTexture);
+        DestroyTexture(SectionDividerTexture);
+        DestroyTexture(SectionAccentTexture);
+        DestroyTexture(MasterSwitchOnTexture);
+        DestroyTexture(MasterSwitchOffTexture);
+        DestroyTexture(MasterSwitchKnobTexture);
         DestroyTexture(ManagementRowAlternateTexture);
         DestroyTexture(ManagementRowHoverTexture);
         DestroyTexture(ManagementDropIndicatorTexture);
@@ -1067,6 +1113,40 @@ internal sealed class MenuStyles
         return texture;
     }
 
+    private static Texture2D CreateRoundedTexture(Color fill, Color line, int radius,
+        int lineWidth, int size) => CreateRoundedTexture(fill, fill, line, radius, lineWidth, size);
+
+    private static Texture2D CreateGradientRoundedTexture(Color left, Color right,
+        int radius, int lineWidth, int size) =>
+        CreateRoundedTexture(left, right, Color.clear, radius, lineWidth, size);
+
+    private static Texture2D CreateRoundedTexture(Color left, Color right, Color line,
+        int radius, int lineWidth, int size)
+    {
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            name = "P.E.A.K_MENU Rounded Style Texture",
+            hideFlags = HideFlags.HideAndDontSave,
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear
+        };
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float edgeX = x < radius ? radius - x : x >= size - radius ? x - (size - radius - 1) : 0f;
+            float edgeY = y < radius ? radius - y : y >= size - radius ? y - (size - radius - 1) : 0f;
+            float distance = Mathf.Sqrt(edgeX * edgeX + edgeY * edgeY);
+            float alpha = Mathf.Clamp01(radius + 0.5f - distance);
+            Color color = Color.Lerp(left, right, x / (float)(size - 1));
+            if (lineWidth > 0 && distance > radius - lineWidth - 0.5f)
+                color = Color.Lerp(color, line, Mathf.Clamp01(distance - (radius - lineWidth - 0.5f)));
+            color.a *= alpha;
+            texture.SetPixel(x, y, color);
+        }
+        texture.Apply(false, false);
+        return texture;
+    }
+
     private static void DestroyTexture(
         Texture2D texture)
     {
@@ -1088,6 +1168,10 @@ internal sealed class MenuStyles
 
         internal Color Accent { get; init; }
         internal Color AccentHover { get; init; }
+        internal Color AccentSecondary { get; init; }
+        internal Color AccentSecondaryHover { get; init; }
+        internal Color Line { get; init; }
+        internal Color LineHover { get; init; }
 
         internal Color ToggleOff { get; init; }
         internal Color ToggleHover { get; init; }
@@ -1254,96 +1338,22 @@ internal sealed class MenuStyles
         {
             return new ThemePalette
             {
-                Window = Color.Lerp(
-                    new Color(
-                        0.07f,
-                        0.08f,
-                        0.10f,
-                        0.98f
-                    ),
-                    tint,
-                    0.18f
-                ),
+                Window = new Color32(0x09, 0x0C, 0x12, 0xFC),
+                Sidebar = new Color32(0x0D, 0x13, 0x1D, 0xFA),
+                Content = new Color32(0x11, 0x17, 0x22, 0xFA),
+                Button = new Color32(0x0B, 0x10, 0x19, 0xFF),
+                ButtonHover = new Color32(0x14, 0x1C, 0x29, 0xFF),
+                ButtonActive = new Color32(0x19, 0x24, 0x35, 0xFF),
 
-                Sidebar = Color.Lerp(
-                    new Color(
-                        0.045f,
-                        0.05f,
-                        0.065f,
-                        1f
-                    ),
-                    tint,
-                    0.20f
-                ),
+                Accent = new Color32(0x7D, 0xD3, 0xFC, 0xFF),
+                AccentHover = new Color32(0xA5, 0xE3, 0xFD, 0xFF),
+                AccentSecondary = accent,
+                AccentSecondaryHover = accentHover,
+                Line = new Color32(0x26, 0x30, 0x44, 0xFF),
+                LineHover = new Color32(0x62, 0x71, 0x8A, 0xFF),
 
-                Content = Color.Lerp(
-                    new Color(
-                        0.10f,
-                        0.11f,
-                        0.14f,
-                        1f
-                    ),
-                    tint,
-                    0.14f
-                ),
-
-                Button = Color.Lerp(
-                    new Color(
-                        0.12f,
-                        0.13f,
-                        0.16f,
-                        1f
-                    ),
-                    tint,
-                    0.15f
-                ),
-
-                ButtonHover = Color.Lerp(
-                    new Color(
-                        0.18f,
-                        0.20f,
-                        0.25f,
-                        1f
-                    ),
-                    accent,
-                    0.16f
-                ),
-
-                ButtonActive = Color.Lerp(
-                    new Color(
-                        0.22f,
-                        0.24f,
-                        0.30f,
-                        1f
-                    ),
-                    accent,
-                    0.24f
-                ),
-
-                Accent = accent,
-                AccentHover = accentHover,
-
-                ToggleOff = Color.Lerp(
-                    new Color(
-                        0.13f,
-                        0.14f,
-                        0.17f,
-                        1f
-                    ),
-                    tint,
-                    0.15f
-                ),
-
-                ToggleHover = Color.Lerp(
-                    new Color(
-                        0.19f,
-                        0.21f,
-                        0.26f,
-                        1f
-                    ),
-                    accent,
-                    0.16f
-                ),
+                ToggleOff = new Color32(0x0B, 0x10, 0x19, 0xFF),
+                ToggleHover = new Color32(0x14, 0x1C, 0x29, 0xFF),
 
                 Resize = new Color(
                     accent.r,
@@ -1352,12 +1362,7 @@ internal sealed class MenuStyles
                     0.20f
                 ),
 
-                Separator = new Color(
-                    accent.r,
-                    accent.g,
-                    accent.b,
-                    0.30f
-                )
+                Separator = new Color32(0x26, 0x30, 0x44, 0xFF)
             };
         }
     }

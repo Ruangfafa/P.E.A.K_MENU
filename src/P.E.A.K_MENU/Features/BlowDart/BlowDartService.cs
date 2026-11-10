@@ -10,15 +10,15 @@ namespace P.E.A.K_MENU.Features.BlowDart;
 internal sealed class BlowDartService :
     IDisposable
 {
-    private const int MinimumAmountPercent = 1;
-    private const int MaximumAmountPercent = 200;
+    private const float MinimumAmountPercent = -200f;
+    private const float MaximumAmountPercent = 200f;
     private const float MinimumDuration = 0.1f;
     private const float MaximumDuration = 600f;
 
     private readonly ConfigEntry<BlowDartEffectType>
         _effectType;
 
-    private readonly ConfigEntry<int>
+    private readonly ConfigEntry<float>
         _amountPercent;
 
     private readonly ConfigEntry<float>
@@ -31,9 +31,9 @@ internal sealed class BlowDartService :
     private Texture2D? _blowDartIcon;
 
     internal BlowDartEffectType EffectType =>
-        _effectType.Value;
+        _effectType.Value == BlowDartEffectType.Whirlwind ? BlowDartEffectType.None : _effectType.Value;
 
-    internal int AmountPercent =>
+    internal float AmountPercent =>
         Mathf.Clamp(
             _amountPercent.Value,
             MinimumAmountPercent,
@@ -78,13 +78,15 @@ internal sealed class BlowDartService :
             "本地玩家发射吹箭时赋予目标的效果。"
         );
 
+        _effectType.Value = BlowDartEffectType.None;
+
         _amountPercent = config.Bind(
             "BlowDart",
             "AmountPercent",
-            20,
+            20f,
             new ConfigDescription(
                 "数值状态的百分制增量；100 对应底层 1。",
-                new AcceptableValueRange<int>(
+                new AcceptableValueRange<float>(
                     MinimumAmountPercent,
                     MaximumAmountPercent
                 )
@@ -108,7 +110,7 @@ internal sealed class BlowDartService :
     internal void SetEffectType(
         BlowDartEffectType effectType)
     {
-        _effectType.Value = effectType;
+        _effectType.Value = effectType == BlowDartEffectType.Whirlwind ? BlowDartEffectType.None : effectType;
 
         LastSucceeded = true;
         LastStatus =
@@ -117,8 +119,10 @@ internal sealed class BlowDartService :
     }
 
     internal void SetAmountPercent(
-        int amountPercent)
+        float amountPercent)
     {
+        if (float.IsNaN(amountPercent) || float.IsInfinity(amountPercent)) return;
+        amountPercent = Mathf.Round(amountPercent / 2.5f) * 2.5f;
         _amountPercent.Value = Mathf.Clamp(
             amountPercent,
             MinimumAmountPercent,
@@ -214,6 +218,15 @@ internal sealed class BlowDartService :
 
             return false;
         }
+    }
+
+    internal void ApplyToSelf()
+    {
+        Character target = Character.localCharacter;
+        if (target == null || !target.IsLocal) { Fail("请先进入关卡。"); return; }
+        if (!TryResolveStatusType(EffectType, out var status)) { Fail("请选择一个状态效果。"); return; }
+        try { ApplyStatus(target, status, AmountPercent / 100f); LastSucceeded = true; LastStatus = "已将效果作用于自己。"; }
+        catch (Exception exception) { Fail(exception.Message); }
     }
 
     internal void GiveBlowDart()
@@ -384,6 +397,19 @@ internal sealed class BlowDartService :
             return;
         }
 
+        if (amount < 0f)
+        {
+            if (target.IsLocal)
+            {
+                target.refs.afflictions.SubtractStatus(statusType, -amount);
+                return;
+            }
+            if (!P.E.A.K_MENU.Features.Teleport.TeleportNetwork.RequestStatusReduction(target, statusType, amount))
+                throw new InvalidOperationException("扣减其他玩家状态需要房主安装新版 PEAK_MENU。");
+            return;
+        }
+        if (amount == 0f) return;
+
         Rigidbody? hip =
             target.GetBodypartRig(
                 BodypartType.Hip
@@ -464,7 +490,7 @@ internal sealed class BlowDartService :
 
     private Item? ResolveBlowDartItem()
     {
-        if (_blowDartItem is not null)
+        if (_blowDartItem != null && _blowDartItem.name == "HealingDart Variant")
         {
             return _blowDartItem;
         }
@@ -480,6 +506,7 @@ internal sealed class BlowDartService :
                  in ItemSpawnRuntime.Catalog.AllItems)
         {
             Item item = entry.Prefab;
+            if (item == null || !string.Equals(item.name, "HealingDart Variant", StringComparison.Ordinal)) continue;
 
             if (item.GetComponentInChildren<
                     Action_RaycastDart>(true) is null)

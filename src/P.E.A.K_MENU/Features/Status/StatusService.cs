@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -580,8 +580,10 @@ internal sealed class StatusService :
         weight = Mathf.Clamp(
             weight,
             0f,
-            1000f
+            200f
         );
+
+        weight = Mathf.Round(weight / 2.5f) * 2.5f;
 
         _customWeight = weight;
         _weightOverrideEnabled = true;
@@ -592,7 +594,7 @@ internal sealed class StatusService :
 
         StatusProtectionPatch
             .WeightOverrideValue =
-                weight;
+                weight / 100f;
 
         Character? character =
             Character.localCharacter;
@@ -1001,14 +1003,14 @@ internal sealed class StatusService :
                 CharacterAfflictions
                     .STATUSTYPE
                     .Weight,
-                weight
+                weight / 100f
             );
 
         if (result)
         {
             StatusProtectionPatch
                 .WeightOverrideValue =
-                    weight;
+                    weight / 100f;
         }
 
         return result;

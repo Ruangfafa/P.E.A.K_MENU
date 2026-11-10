@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -361,12 +361,14 @@ internal static class StatusProtectionPatch
 /// 游戏每次重新计算负重后，
 /// 将状态覆盖为菜单指定的数值。
 /// </summary>
-[HarmonyPatch(
-    typeof(CharacterAfflictions),
-    "UpdateWeight"
-)]
+[HarmonyPatch]
 internal static class WeightOverridePatch
 {
+    private static System.Collections.Generic.IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(CharacterAfflictions), "UpdateWeight");
+        yield return AccessTools.Method(typeof(CharacterAfflictions), "SyncStatusesRPC");
+    }
     private static void Postfix(
         CharacterAfflictions __instance)
     {
